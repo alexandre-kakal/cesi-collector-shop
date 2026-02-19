@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { Roles, RolesGuard, Role } from '@app/shared';
+import { Roles, RolesGuard, Role, Public } from '@app/shared';
 
 @Controller('api/v1/categories')
 export class CategoryController {
@@ -16,11 +16,13 @@ export class CategoryController {
   }
 
   @Get()
+  @Public()
   findAll() {
     return this.categoryService.findAll();
   }
 
   @Get(':id')
+  @Public()
   findOne(@Param('id') id: string) {
     return this.categoryService.findOne(id);
   }

@@ -10,9 +10,19 @@ export * from './interfaces/request-user.interface';
 // Decorators
 export * from './decorators/current-user.decorator';
 export * from './decorators/roles.decorator';
+export * from './decorators/public.decorator';
+export * from './decorators/check-ownership.decorator';
+
+// Strategies
+export * from './strategies/jwt.strategy';
 
 // Guards
 export * from './guards/roles.guard';
+export * from './guards/jwt-auth.guard';
+export * from './guards/ownership.guard';
+
+// Filters
+export * from './filters/auth-exception.filter';
 
 // Events
 export * from './events/user.events';

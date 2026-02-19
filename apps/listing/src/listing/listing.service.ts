@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateListingDto } from './dto/create-listing.dto';
@@ -9,6 +9,8 @@ import {
   RABBITMQ_ROUTING_KEYS,
   ListingCreatedEvent,
   ListingStatus,
+  RequestUser,
+  Role,
 } from '@app/shared';
 
 @Injectable()
@@ -46,12 +48,30 @@ export class ListingService {
     return listing;
   }
 
-  async findAll(filter: FilterListingDto) {
+  async findAll(filter: FilterListingDto, user?: RequestUser) {
     const { status, categoryId, page = 1, limit = 20 } = filter;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (status) where.status = status;
+
+    // Visibility rules based on user role
+    if (!user || user.role === Role.BUYER) {
+      // Public/BUYER: Only APPROVED listings
+      where.status = ListingStatus.APPROVED;
+    } else if (user.role === Role.SELLER) {
+      // SELLER: APPROVED OR (PENDING AND owned by them)
+      where.OR = [
+        { status: ListingStatus.APPROVED },
+        { status: ListingStatus.PENDING, sellerId: user.id },
+      ];
+    }
+    // ADMIN: No filter, sees all statuses
+
+    // Apply additional filters
+    if (status && user?.role === Role.ADMIN) {
+      delete where.OR;
+      where.status = status;
+    }
     if (categoryId) where.categoryId = categoryId;
 
     const [items, total] = await Promise.all([
@@ -68,26 +88,70 @@ export class ListingService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: RequestUser) {
     const listing = await this.prisma.listing.findUnique({
       where: { id },
       include: { category: true, photos: true },
     });
-    if (!listing) throw new NotFoundException(`Listing ${id} not found`);
+
+    if (!listing) {
+      throw new NotFoundException(`Listing ${id} not found`);
+    }
+
+    // Visibility check
+    if (!user || user.role === Role.BUYER) {
+      if (listing.status !== ListingStatus.APPROVED) {
+        throw new ForbiddenException('This listing is not available');
+      }
+    } else if (user.role === Role.SELLER) {
+      if (listing.status === ListingStatus.PENDING && listing.sellerId !== user.id) {
+        throw new ForbiddenException('This listing is not available');
+      }
+      if (listing.status === ListingStatus.REJECTED && listing.sellerId !== user.id) {
+        throw new ForbiddenException('This listing is not available');
+      }
+    }
+    // ADMIN can see everything
+
     return listing;
   }
 
-  async update(id: string, dto: UpdateListingDto, _userId: string) {
-    await this.findOne(id);
-    return this.prisma.listing.update({
+  async update(id: string, dto: UpdateListingDto, user: RequestUser) {
+    const listing = await this.findOne(id, user);
+
+    // Re-moderation logic: SELLER editing APPROVED listing → back to PENDING
+    let newStatus = listing.status;
+    if (user.role === Role.SELLER && listing.status === ListingStatus.APPROVED) {
+      newStatus = ListingStatus.PENDING;
+      this.logger.log(`Listing ${id} status changed to PENDING due to SELLER modification`);
+    }
+    // ADMIN updates don't trigger re-moderation
+
+    const updated = await this.prisma.listing.update({
       where: { id },
-      data: dto,
+      data: { ...dto, status: newStatus },
       include: { category: true, photos: true },
     });
+
+    // Emit event if status changed back to PENDING
+    if (newStatus === ListingStatus.PENDING && listing.status !== ListingStatus.PENDING) {
+      const event: ListingCreatedEvent = {
+        listingId: updated.id,
+        sellerId: updated.sellerId,
+        title: updated.title,
+        categoryId: updated.categoryId,
+        price: Number(updated.price),
+        createdAt: updated.createdAt,
+      };
+      this.rmqClient.emit(RABBITMQ_ROUTING_KEYS.LISTING_CREATED, event);
+      this.logger.log(`Re-enqueued listing ${id} for moderation`);
+    }
+
+    return updated;
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, user: RequestUser) {
+    await this.findOne(id, user);
     return this.prisma.listing.delete({ where: { id } });
   }
 
@@ -102,5 +166,18 @@ export class ListingService {
     return this.prisma.listingPhoto.create({
       data: { listingId, mediaId, order },
     });
+  }
+
+  async checkOwnership(listingId: string, userId: string): Promise<boolean> {
+    const listing = await this.prisma.listing.findUnique({
+      where: { id: listingId },
+      select: { sellerId: true },
+    });
+
+    if (!listing) {
+      throw new NotFoundException(`Listing ${listingId} not found`);
+    }
+
+    return listing.sellerId === userId;
   }
 }

@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
+import { AuthExceptionFilter } from '@app/shared';
 
 async function bootstrap() {
   const logger = new Logger('MediaService');
@@ -33,6 +34,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.useGlobalFilters(new AuthExceptionFilter());
 
   app.enableCors({ origin: '*' });
 

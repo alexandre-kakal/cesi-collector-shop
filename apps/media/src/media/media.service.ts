@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
@@ -100,9 +100,51 @@ export class MediaService {
   }
 
   async findOne(id: string) {
-    return this.prisma.mediaFile.findUnique({
+    const media = await this.prisma.mediaFile.findUnique({
       where: { id },
       include: { variants: true },
     });
+    if (!media) throw new NotFoundException(`Media ${id} not found`);
+    return media;
+  }
+
+  async checkOwnership(mediaId: string, userId: string): Promise<boolean> {
+    const media = await this.prisma.mediaFile.findUnique({
+      where: { id: mediaId },
+      select: { uploadedBy: true },
+    });
+
+    if (!media) {
+      throw new NotFoundException(`Media ${mediaId} not found`);
+    }
+
+    return media.uploadedBy === userId;
+  }
+
+  async remove(id: string) {
+    const media = await this.prisma.mediaFile.findUnique({
+      where: { id },
+      include: { variants: true },
+    });
+
+    if (!media) {
+      throw new NotFoundException(`Media ${id} not found`);
+    }
+
+    // Delete from MinIO (original + variants)
+    try {
+      await this.minioService.delete(media.storageKey);
+      for (const variant of media.variants) {
+        await this.minioService.delete(variant.storageKey);
+      }
+    } catch (error) {
+      this.logger.error(`Error deleting media files from MinIO: ${error.message}`);
+    }
+
+    // Delete from database (cascade will delete variants)
+    await this.prisma.mediaFile.delete({ where: { id } });
+
+    this.logger.log(`Media ${id} deleted successfully`);
+    return { message: 'Media deleted successfully' };
   }
 }

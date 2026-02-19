@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ListingService } from './listing.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RABBITMQ_CLIENT_TOKEN, ListingStatus } from '@app/shared';
+import { RABBITMQ_CLIENT_TOKEN, ListingStatus, Role, RequestUser } from '@app/shared';
 
 describe('ListingService (unit)', () => {
   let service: ListingService;
@@ -76,11 +76,35 @@ describe('ListingService (unit)', () => {
   });
 
   describe('findOne', () => {
-    it('should return a listing by id', async () => {
-      const listing = { id: '1', title: 'A', category: null, photos: [] };
+    it('should return a listing by id when status is APPROVED', async () => {
+      const listing = {
+        id: '1',
+        title: 'A',
+        status: ListingStatus.APPROVED,
+        sellerId: 'user-1',
+        category: null,
+        photos: [],
+      };
       mockPrisma.listing.findUnique.mockResolvedValue(listing);
 
       const result = await service.findOne('1');
+
+      expect(result).toEqual(listing);
+    });
+
+    it('should return listing when user is ADMIN', async () => {
+      const adminUser: RequestUser = { id: 'admin', email: 'admin@test.com', role: Role.ADMIN };
+      const listing = {
+        id: '1',
+        title: 'A',
+        status: ListingStatus.PENDING,
+        sellerId: 'user-1',
+        category: null,
+        photos: [],
+      };
+      mockPrisma.listing.findUnique.mockResolvedValue(listing);
+
+      const result = await service.findOne('1', adminUser);
 
       expect(result).toEqual(listing);
     });
@@ -93,17 +117,31 @@ describe('ListingService (unit)', () => {
   });
 
   describe('update', () => {
+    const mockUser: RequestUser = {
+      id: 'user-1',
+      email: 'user@test.com',
+      role: Role.SELLER,
+    };
+
     it('should update a listing and return it', async () => {
       const dto = { title: 'Updated' };
-      const updated = { id: '1', ...dto, category: null, photos: [] };
-      mockPrisma.listing.findUnique.mockResolvedValue({ id: '1' });
+      const existing = {
+        id: '1',
+        title: 'Old',
+        status: ListingStatus.PENDING,
+        sellerId: 'user-1',
+        category: null,
+        photos: [],
+      };
+      const updated = { ...existing, ...dto, status: ListingStatus.PENDING };
+      mockPrisma.listing.findUnique.mockResolvedValue(existing);
       mockPrisma.listing.update.mockResolvedValue(updated);
 
-      const result = await service.update('1', dto, 'user-1');
+      const result = await service.update('1', dto, mockUser);
 
       expect(mockPrisma.listing.update).toHaveBeenCalledWith({
         where: { id: '1' },
-        data: dto,
+        data: { ...dto, status: ListingStatus.PENDING },
         include: { category: true, photos: true },
       });
       expect(result).toEqual(updated);
@@ -112,16 +150,76 @@ describe('ListingService (unit)', () => {
     it('should throw when listing not found', async () => {
       mockPrisma.listing.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('invalid', { title: 'x' }, 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(service.update('invalid', { title: 'x' }, mockUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should change APPROVED listing to PENDING when SELLER updates', async () => {
+      const dto = { title: 'Updated' };
+      const existing = {
+        id: '1',
+        status: ListingStatus.APPROVED,
+        sellerId: 'user-1',
+        title: 'Original',
+        categoryId: 'cat-1',
+        price: 100,
+        createdAt: new Date(),
+        category: null,
+        photos: [],
+      };
+      const updated = { ...existing, ...dto, status: ListingStatus.PENDING };
+      mockPrisma.listing.findUnique.mockResolvedValue(existing);
+      mockPrisma.listing.update.mockResolvedValue(updated);
+
+      await service.update('1', dto, mockUser);
+
+      expect(mockPrisma.listing.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { ...dto, status: ListingStatus.PENDING },
+        include: { category: true, photos: true },
+      });
+      expect(mockRmq.emit).toHaveBeenCalled();
+    });
+
+    it('should NOT change status when ADMIN updates APPROVED listing', async () => {
+      const adminUser: RequestUser = { id: 'admin-1', email: 'admin@test.com', role: Role.ADMIN };
+      const dto = { title: 'Updated' };
+      const existing = {
+        id: '1',
+        status: ListingStatus.APPROVED,
+        sellerId: 'user-1',
+        category: null,
+        photos: [],
+      };
+      const updated = { ...existing, ...dto };
+      mockPrisma.listing.findUnique.mockResolvedValue(existing);
+      mockPrisma.listing.update.mockResolvedValue(updated);
+
+      await service.update('1', dto, adminUser);
+
+      expect(mockPrisma.listing.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { ...dto, status: ListingStatus.APPROVED },
+        include: { category: true, photos: true },
+      });
     });
   });
 
   describe('remove', () => {
     it('should delete a listing', async () => {
-      mockPrisma.listing.findUnique.mockResolvedValue({ id: '1' });
+      const listing = {
+        id: '1',
+        status: ListingStatus.APPROVED,
+        sellerId: 'user-1',
+        category: null,
+        photos: [],
+      };
+      const user: RequestUser = { id: 'user-1', email: 'u@test.com', role: Role.SELLER };
+      mockPrisma.listing.findUnique.mockResolvedValue(listing);
       mockPrisma.listing.delete.mockResolvedValue({ id: '1' });
 
-      await service.remove('1');
+      await service.remove('1', user);
 
       expect(mockPrisma.listing.delete).toHaveBeenCalledWith({ where: { id: '1' } });
     });

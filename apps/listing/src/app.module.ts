@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { CategoryModule } from './category/category.module';
 import { ListingModule } from './listing/listing.module';
 import { EventsModule } from './events/events.module';
+import { JwtStrategy, JwtAuthGuard } from '@app/shared';
 
 @Module({
   imports: [
@@ -11,10 +15,29 @@ import { EventsModule } from './events/events.module';
       isGlobal: true,
       envFilePath: 'apps/listing/.env',
     }),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        publicKey: configService
+          .get<string>('JWT_PUBLIC_KEY')
+          ?.replace(/\\n/g, '\n'),
+        signOptions: { algorithm: 'RS256' },
+      }),
+      inject: [ConfigService],
+      global: true,
+    }),
     PrismaModule,
     CategoryModule,
     ListingModule,
     EventsModule,
+  ],
+  providers: [
+    JwtStrategy,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
 })
 export class AppModule {}

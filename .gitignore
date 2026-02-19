@@ -6,18 +6,19 @@ node_modules/
 # Build outputs
 dist/
 build/
+.nest/
 
-# Prisma generated clients
+# Prisma
 node_modules/.prisma/
+*.db
+*.sqlite
+*.sqlite3
 
-# Environment files
+# Environment files (ne pas versionner les secrets)
 .env
-.env.local
-.env.development
-.env.test
-.env.production
-# Keep .env.example in git
+.env.*
 !.env.example
+!.env.test.example
 
 # Logs
 logs/
@@ -26,14 +27,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
+*.swp
+*~
 
-# IDE
+# IDE / éditeurs
 .vscode/
 .idea/
+.cursor/
 *.suo
 *.ntvs*
 *.njsproj
@@ -43,10 +48,25 @@ Thumbs.db
 # Testing
 coverage/
 *.lcov
+.nyc_output/
 
 # TypeScript
 *.tsbuildinfo
 
-# Misc
+# Cache / temporaires
 .cache/
 tmp/
+temp/
+*.tmp
+
+# Uploads / stockage local (MinIO en dev)
+uploads/
+storage/
+
+# Turbo / monorepo
+.turbo/
+
+# Clés / certificats (optionnel : décommenter pour ne pas versionner les clés de test)
+# test/keys/
+# *.pem
+# *.key
