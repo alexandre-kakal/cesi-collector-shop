@@ -36,8 +36,13 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "test": "jest",
+    "test:unit": "jest --testPathIgnorePatterns=integration-spec --no-watchman",
+    "test:integration": "jest --testPathPatterns=integration-spec --runInBand --setupFiles=./jest.setup.integration.js --no-watchman",
+    "test:all": "npm run test:unit && npm run test:integration",
+    "test:setup": "node scripts/test-setup.js",
+    "test:ci": "npm run test:setup && npm run test:all",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage --testPathIgnorePatterns=integration-spec --no-watchman"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.14",
@@ -104,21 +109,7 @@
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.3"
-  },
-  "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
-    "rootDir": ".",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
-    "coverageDirectory": "./coverage",
-    "testEnvironment": "node",
-    "roots": ["<rootDir>/apps/", "<rootDir>/libs/"],
-    "moduleNameMapper": {
-      "^@app/shared(|/.*)$": "<rootDir>/libs/shared/src/$1"
-    }
+    "typescript": "^5.9.3",
+    "pg": "^8.13.0"
   }
 }
