@@ -1,0 +1,277 @@
+version: '3.9'
+
+networks:
+  collector-net:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-listing-data:
+  postgres-moderation-data:
+  postgres-media-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+
+services:
+  # ============================================================
+  # PostgreSQL — Auth DB
+  # ============================================================
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: collector-postgres-auth
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_password
+      POSTGRES_DB: auth_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U auth_user -d auth_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # PostgreSQL — Listing DB
+  # ============================================================
+  postgres-listing:
+    image: postgres:16-alpine
+    container_name: collector-postgres-listing
+    environment:
+      POSTGRES_USER: listing_user
+      POSTGRES_PASSWORD: listing_password
+      POSTGRES_DB: listing_db
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres-listing-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U listing_user -d listing_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # PostgreSQL — Moderation DB
+  # ============================================================
+  postgres-moderation:
+    image: postgres:16-alpine
+    container_name: collector-postgres-moderation
+    environment:
+      POSTGRES_USER: moderation_user
+      POSTGRES_PASSWORD: moderation_password
+      POSTGRES_DB: moderation_db
+    ports:
+      - '5434:5432'
+    volumes:
+      - postgres-moderation-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U moderation_user -d moderation_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # PostgreSQL — Media DB
+  # ============================================================
+  postgres-media:
+    image: postgres:16-alpine
+    container_name: collector-postgres-media
+    environment:
+      POSTGRES_USER: media_user
+      POSTGRES_PASSWORD: media_password
+      POSTGRES_DB: media_db
+    ports:
+      - '5435:5432'
+    volumes:
+      - postgres-media-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U media_user -d media_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # Redis — Session storage & JWT blacklist
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: collector-redis
+    command: redis-server --requirepass redis_password --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'redis_password', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ============================================================
+  # RabbitMQ — Event bus
+  # ============================================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: collector-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbit_user
+      RABBITMQ_DEFAULT_PASS: rabbit_password
+      RABBITMQ_DEFAULT_VHOST: collector
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ============================================================
+  # MinIO — Object storage
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    container_name: collector-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # Auth Service
+  # ============================================================
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    container_name: collector-auth
+    env_file:
+      - apps/auth/.env
+    environment:
+      DATABASE_URL: postgresql://auth_user:auth_password@postgres-auth:5432/auth_db?schema=public
+      REDIS_HOST: redis
+      RABBITMQ_URL: amqp://rabbit_user:rabbit_password@rabbitmq:5672/collector
+    ports:
+      - '3010:3010'
+    networks:
+      - collector-net
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Listing Service
+  # ============================================================
+  listing:
+    build:
+      context: .
+      dockerfile: apps/listing/Dockerfile
+    container_name: collector-listing
+    env_file:
+      - apps/listing/.env
+    environment:
+      DATABASE_URL: postgresql://listing_user:listing_password@postgres-listing:5432/listing_db?schema=public
+      RABBITMQ_URL: amqp://rabbit_user:rabbit_password@rabbitmq:5672/collector
+    ports:
+      - '3020:3020'
+    networks:
+      - collector-net
+    depends_on:
+      postgres-listing:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Moderation Service
+  # ============================================================
+  moderation:
+    build:
+      context: .
+      dockerfile: apps/moderation/Dockerfile
+    container_name: collector-moderation
+    env_file:
+      - apps/moderation/.env
+    environment:
+      DATABASE_URL: postgresql://moderation_user:moderation_password@postgres-moderation:5432/moderation_db?schema=public
+      RABBITMQ_URL: amqp://rabbit_user:rabbit_password@rabbitmq:5672/collector
+    ports:
+      - '3030:3030'
+    networks:
+      - collector-net
+    depends_on:
+      postgres-moderation:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Media Service
+  # ============================================================
+  media:
+    build:
+      context: .
+      dockerfile: apps/media/Dockerfile
+    container_name: collector-media
+    env_file:
+      - apps/media/.env
+    environment:
+      DATABASE_URL: postgresql://media_user:media_password@postgres-media:5432/media_db?schema=public
+      RABBITMQ_URL: amqp://rabbit_user:rabbit_password@rabbitmq:5672/collector
+      MINIO_ENDPOINT: minio
+    ports:
+      - '3050:3050'
+    networks:
+      - collector-net
+    depends_on:
+      postgres-media:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped

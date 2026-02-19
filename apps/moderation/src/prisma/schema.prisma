@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/.prisma/moderation-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ModerationQueue {
+  id         String      @id @default(uuid())
+  listingId  String      @unique
+  sellerId   String
+  status     QueueStatus @default(WAITING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("moderation_queue")
+}
+
+model ModerationLog {
+  id        String           @id @default(uuid())
+  adminId   String
+  listingId String
+  action    ModerationAction
+  reason    String?
+  ipAddress String?
+  createdAt DateTime         @default(now())
+
+  @@map("moderation_logs")
+}
+
+enum QueueStatus {
+  WAITING
+  IN_REVIEW
+  DONE
+}
+
+enum ModerationAction {
+  APPROVE
+  REJECT
+}

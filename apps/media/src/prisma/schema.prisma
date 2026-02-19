@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/.prisma/media-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model MediaFile {
+  id           String        @id @default(uuid())
+  uploadedBy   String
+  listingId    String?
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String        @unique
+  status       MediaStatus   @default(PROCESSING)
+  variants     MediaVariant[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("media_files")
+}
+
+model MediaVariant {
+  id          String      @id @default(uuid())
+  mediaFileId String
+  mediaFile   MediaFile   @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  variantType VariantType
+  storageKey  String      @unique
+  width       Int
+  height      Int
+  size        Int
+  createdAt   DateTime    @default(now())
+
+  @@map("media_variants")
+}
+
+enum MediaStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum VariantType {
+  THUMB
+  OPTIMIZED
+  ORIGINAL
+}
