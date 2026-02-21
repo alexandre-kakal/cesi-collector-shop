@@ -20,9 +20,8 @@ PAT_TOKEN = "ghp_xxxxxxxxxxxxx"
 #### Secrets Optionnels (mais recommandés)
 
 ```bash
-# SonarQube
-SONAR_TOKEN = "your-sonarqube-token"
-SONAR_HOST_URL = "https://sonarcloud.io"
+# SonarCloud : analyse via Automatic Analysis (à chaque push sur la branche par défaut).
+# Aucun secret GitHub requis pour SonarCloud.
 
 # Snyk
 SNYK_TOKEN = "your-snyk-token"
@@ -56,34 +55,19 @@ Les workflows poussent les images sur **ghcr.io** (GitHub Container Registry). A
 7. Copier le token `ghp_xxxxxxxxxxxxx`
 
 ```yaml
-PAT_TOKEN: "ghp_xxxxxxxxxxxxx"
+PAT_TOKEN: 'ghp_xxxxxxxxxxxxx'
 ```
 
-### 3. SonarQube (Qualité de code)
+### 3. SonarCloud (Qualité de code)
 
-**Optionnel mais recommandé** pour la qualité du code. Un **seul projet SonarQube** couvre tout le repo (workflow `sonarqube.yml`).
-
-#### SonarCloud (Cloud, Gratuit pour open-source)
+L’analyse est faite par **Automatic Analysis** (à chaque push sur la branche par défaut). Aucun secret GitHub n’est nécessaire.
 
 1. Aller sur [sonarcloud.io](https://sonarcloud.io)
-2. Login avec GitHub
-3. Créer une organisation
-4. My Account → Security → Generate Token
-5. Créer **un projet** pour tout le repo (ex. clé : `cesi-collector-shop`)
+2. Se connecter avec GitHub
+3. Créer une organisation et un projet, puis lier le repo GitHub
+4. Activer **Automatic Analysis** pour la branche par défaut
 
-```yaml
-SONAR_TOKEN: "sqp_xxxxxxxxxxxxx"
-SONAR_HOST_URL: "https://sonarcloud.io"
-```
-
-La clé du projet dans le workflow est `cesi-collector-shop` (modifiable dans `.github/workflows/sonarqube.yml` si ta clé est différente).
-
-#### SonarQube Self-hosted
-
-```yaml
-SONAR_TOKEN: "your-token"
-SONAR_HOST_URL: "https://your-sonarqube-instance.com"
-```
+Les rapports s’affichent sur SonarCloud après chaque push.
 
 ### 4. Snyk (Sécurité)
 
@@ -95,7 +79,7 @@ SONAR_HOST_URL: "https://your-sonarqube-instance.com"
 4. Copier le token
 
 ```yaml
-SNYK_TOKEN: "xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
+SNYK_TOKEN: 'xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx'
 ```
 
 ### 5. Notifications Discord
@@ -107,7 +91,7 @@ SNYK_TOKEN: "xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
 3. Choisir le salon et copier l’URL du webhook
 
 ```yaml
-DISCORD_WEBHOOK: "https://discord.com/api/webhooks/123456789/xxxxxxxxxxxxx"
+DISCORD_WEBHOOK: 'https://discord.com/api/webhooks/123456789/xxxxxxxxxxxxx'
 ```
 
 ---
@@ -121,7 +105,7 @@ gh secret list
 
 # Au minimum:
 # PAT_TOKEN
-# (optionnel: SONAR_TOKEN, SONAR_HOST_URL, SNYK_TOKEN, DISCORD_WEBHOOK)
+# (optionnel: SNYK_TOKEN, DISCORD_WEBHOOK)
 ```
 
 ### Test 2: Trigger un workflow manuellement
@@ -146,24 +130,23 @@ git push
 
 ---
 
-## 🎯 Configuration Minimale (Sans SonarQube/Snyk)
+## 🎯 Configuration Minimale (Sans Snyk)
 
 Si vous voulez juste build et déployer sans les scans avancés:
 
 ### Secrets requis uniquement:
 
 ```yaml
-PAT_TOKEN: "ghp_xxxxx"
+PAT_TOKEN: 'ghp_xxxxx'
 ```
 
 ### Modifier les workflows:
 
-Commenter les jobs `security` et `sonarqube` dans les 4 workflows:
+Commenter le job `security` dans les 4 workflows si besoin :
 
 ```yaml
 # jobs:
 #   security:    # Commenter tout ce job
-#   sonarqube:   # Commenter tout ce job
 ```
 
 ---
@@ -206,6 +189,7 @@ Après la configuration, vérifiez:
 Votre CI/CD est opérationnelle ! 🚀
 
 **Workflow:**
+
 ```
 Push code → Tests → Build → Push image → Update k8s → ArgoCD deploy
 ```
@@ -219,6 +203,7 @@ Push code → Tests → Build → Push image → Update k8s → ArgoCD deploy
 **Cause:** Problème d’accès au GitHub Container Registry.
 
 **Solution:**
+
 1. Vérifier que le workflow a bien les permissions `contents: read` et `packages: write`
 2. Pour un repo organisation, s’assurer que les actions sont autorisées et que le `GITHUB_TOKEN` peut écrire dans les packages
 
@@ -227,17 +212,13 @@ Push code → Tests → Build → Push image → Update k8s → ArgoCD deploy
 **Cause:** `PAT_TOKEN` n'a pas les bonnes permissions.
 
 **Solution:**
+
 1. Régénérer un PAT avec scope `repo`
 2. Mettre à jour le secret
 
-### "SonarQube analysis failed"
+### "SonarCloud n’affiche pas les analyses"
 
-**Cause:** `SONAR_TOKEN` ou `SONAR_HOST_URL` incorrect.
-
-**Solution:**
-1. Vérifier que les projets existent sur SonarCloud
-2. Régénérer le token
-3. OU commenter le job SonarQube si non utilisé
+**Cause:** L’analyse est faite par Automatic Analysis (pas de workflow CI). Vérifier sur [sonarcloud.io](https://sonarcloud.io) que le repo est bien lié et que l’Automatic Analysis est activée pour la branche par défaut.
 
 ### "Workflow doesn't trigger"
 
@@ -245,6 +226,7 @@ Push code → Tests → Build → Push image → Update k8s → ArgoCD deploy
 
 **Solution:**
 Modifier un fichier dans le bon dossier:
+
 ```bash
 echo "test" >> apps/auth/src/main.ts
 git add . && git commit -m "test" && git push

@@ -190,7 +190,7 @@ PR vers main/develop
 1. Lint ✓
 2. Test ✓
 3. Security ✓
-(+ SonarQube en parallèle via workflow sonarqube.yml)
+(SonarCloud : Automatic Analysis sur la branche par défaut)
     ↓
 Résultats dans PR checks
 ```
