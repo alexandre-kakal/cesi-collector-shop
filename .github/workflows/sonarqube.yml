@@ -43,6 +43,11 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma clients
+        env:
+          AUTH_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          LISTING_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MEDIA_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MODERATION_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
         run: |
           npm run prisma:generate:auth
           npm run prisma:generate:listing

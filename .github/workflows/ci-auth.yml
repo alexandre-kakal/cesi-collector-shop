@@ -65,6 +65,8 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run prisma:generate:auth
+        env:
+          AUTH_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
 
       - name: Run unit tests
         run: npm run test:unit -- --testPathPattern=apps/auth
@@ -72,7 +74,7 @@ jobs:
       - name: Run integration tests
         run: npm run test:integration -- --testPathPattern=apps/auth
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+          AUTH_DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
 
       - name: Generate coverage report
         run: npm run test:cov -- --testPathPattern=apps/auth --coverageDirectory=coverage/auth
@@ -88,6 +90,9 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -122,7 +127,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
@@ -136,6 +141,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}
@@ -196,7 +202,7 @@ jobs:
           output: 'trivy-image-results.sarif'
 
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-image-results.sarif'
