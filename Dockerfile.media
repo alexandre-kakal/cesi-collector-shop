@@ -15,9 +15,8 @@ RUN npm ci
 COPY apps/media ./apps/media
 COPY libs ./libs
 
-# Generate Prisma client for media
-COPY apps/media/prisma ./apps/media/prisma
-RUN npx prisma generate --schema=./apps/media/prisma/schema.prisma
+# Generate Prisma client for media (schema in apps/media/src/prisma, URL only for generate)
+RUN MEDIA_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate --schema=apps/media/src/prisma/schema.prisma
 
 # Build the application
 RUN npm run build:media
@@ -27,21 +26,29 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Run as non-root user
+RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+
 # Copy package files
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy Prisma schema and generate client
-COPY apps/media/prisma ./apps/media/prisma
-RUN npx prisma generate --schema=./apps/media/prisma/schema.prisma
+# Copy generated Prisma client from builder
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
+# Own app dir for non-root user
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
 # Expose port
 EXPOSE 3050
 
-# Start the application
+# Start the application (MEDIA_DATABASE_URL must be set at runtime)
 CMD ["node", "dist/apps/media/main.js"]
