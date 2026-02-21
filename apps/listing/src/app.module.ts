@@ -7,7 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { CategoryModule } from './category/category.module';
 import { ListingModule } from './listing/listing.module';
 import { EventsModule } from './events/events.module';
-import { JwtStrategy, JwtAuthGuard } from '@app/shared';
+import { JwtStrategy, JwtAuthGuard, HealthController } from '@app/shared';
 
 @Module({
   imports: [
@@ -32,6 +32,7 @@ import { JwtStrategy, JwtAuthGuard } from '@app/shared';
     ListingModule,
     EventsModule,
   ],
+  controllers: [HealthController],
   providers: [
     JwtStrategy,
     {

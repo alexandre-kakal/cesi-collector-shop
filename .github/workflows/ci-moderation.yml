@@ -1,0 +1,230 @@
+name: CI/CD - Moderation Service
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/moderation/**'
+      - 'libs/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile.moderation'
+      - '.github/workflows/ci-moderation.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/moderation/**'
+      - 'libs/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile.moderation'
+
+env:
+  SERVICE_NAME: moderation
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Prettier check
+        run: npx prettier --check "apps/moderation/**/*.ts"
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate:moderation
+
+      - name: Run unit tests
+        run: npm run test:unit -- --testPathPattern=apps/moderation
+
+      - name: Run integration tests
+        run: npm run test:integration -- --testPathPattern=apps/moderation
+
+      - name: Generate coverage report
+        run: npm run test:cov -- --testPathPattern=apps/moderation --coverageDirectory=coverage/moderation
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/moderation/lcov.info
+          flags: moderation
+          name: moderation-coverage
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=package.json
+
+      - name: Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'apps/moderation'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, test, security]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Docker image (GHCR)
+        run: echo "DOCKER_IMAGE=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/cesi-shop-moderation" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.moderation
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+  update-manifests:
+    name: Update K8s Manifests
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Update image tag in manifest
+        run: |
+          NEW_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+          sed -i "s|image: .*cesi-shop-moderation:.*|image: ${NEW_TAG}|g" k8s/apps/moderation.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/apps/moderation.yaml
+          git commit -m "chore(moderation): update image to ${{ needs.build.outputs.image_tag }}" || echo "No changes to commit"
+          git push
+
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'failure')
+    steps:
+      - name: Send Discord notification
+        run: |
+          STATUS="${{ needs.build.result }}"
+          COLOR=3066993
+          [ "$STATUS" = "failure" ] && COLOR=15158332
+          IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+          payload=$(jq -n \
+            --arg content "**Moderation Service** CI/CD — $STATUS" \
+            --arg image "$IMAGE_TAG" \
+            --argjson color "$COLOR" \
+            '{ embeds: [{ title: "CI/CD Notification", description: $content, color: $color, fields: [{ name: "Image", value: $image, inline: false }] }] }')
+          curl -sS -H "Content-Type: application/json" -d "$payload" "${{ secrets.DISCORD_WEBHOOK }}" || true

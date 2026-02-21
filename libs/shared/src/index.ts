@@ -24,6 +24,9 @@ export * from './guards/ownership.guard';
 // Filters
 export * from './filters/auth-exception.filter';
 
+// Controllers
+export * from './health.controller';
+
 // Events
 export * from './events/user.events';
 export * from './events/listing.events';

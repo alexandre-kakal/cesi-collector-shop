@@ -1,0 +1,47 @@
+# Dockerfile for Moderation Service
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY apps/moderation ./apps/moderation
+COPY libs ./libs
+
+# Generate Prisma client for moderation
+COPY apps/moderation/prisma ./apps/moderation/prisma
+RUN npx prisma generate --schema=./apps/moderation/prisma/schema.prisma
+
+# Build the application
+RUN npm run build:moderation
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy Prisma schema and generate client
+COPY apps/moderation/prisma ./apps/moderation/prisma
+RUN npx prisma generate --schema=./apps/moderation/prisma/schema.prisma
+
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
+
+# Expose port
+EXPOSE 3030
+
+# Start the application
+CMD ["node", "dist/apps/moderation/main.js"]
