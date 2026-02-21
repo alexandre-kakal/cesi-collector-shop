@@ -86,10 +86,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma Client
-        run: npm run prisma:generate:auth
+      - name: Generate all Prisma clients
         env:
           AUTH_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          LISTING_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MEDIA_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MODERATION_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+        run: |
+          npm run prisma:generate:auth
+          npm run prisma:generate:listing
+          npm run prisma:generate:media
+          npm run prisma:generate:moderation
 
       - name: Run unit tests
         run: npm run test:unit -- --testPathPatterns=apps/auth
@@ -100,7 +107,7 @@ jobs:
           AUTH_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_auth_test
 
       - name: Run integration tests
-        run: npm run test:integration -- --testPathPatterns="apps/auth.*integration-spec"
+        run: npx jest --testPathPatterns="apps/auth.*integration-spec" --runInBand --setupFiles=./jest.setup.integration.js --no-watchman
         env:
           AUTH_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_auth_test
 
