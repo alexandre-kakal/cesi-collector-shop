@@ -62,13 +62,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -102,29 +95,10 @@ jobs:
         env:
           MEDIA_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_media_test
 
-      - name: Wait for MinIO
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:9000/minio/health/live; then
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "MinIO did not become ready in time"
-              exit 1
-            fi
-            sleep 2
-          done
-
       - name: Run integration tests
         run: npx jest --testPathPatterns="apps/media.*integration-spec" --runInBand --setupFiles=./jest.setup.integration.js --no-watchman
         env:
           MEDIA_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_media_test
-          MINIO_ENDPOINT: localhost
-          MINIO_PORT: "9000"
-          MINIO_USE_SSL: "false"
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
-          MINIO_BUCKET_NAME: collector-media-test
 
       - name: Generate coverage report
         run: npm run test:cov -- --testPathPatterns=apps/media --coverageDirectory=coverage/media

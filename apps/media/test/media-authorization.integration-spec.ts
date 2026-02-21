@@ -14,10 +14,16 @@ import {
 } from '../../../test/helpers/auth.helper';
 const smallestJpeg = require('smallest-jpeg') as Buffer;
 
+/** Mock MinIO pour les tests d'intégration (autorisation / contrat API sans stockage réel). */
+const mockMinioService = {
+  upload: jest.fn().mockResolvedValue(undefined),
+  delete: jest.fn().mockResolvedValue(undefined),
+  getPublicUrl: jest.fn((key: string) => `http://minio-test/${key}`),
+};
+
 describe('Media Service - Authorization Matrix', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let minioService: MinioService;
   let testMediaId: string;
   let seller2MediaId: string;
   let testJpegPath: string;
@@ -29,14 +35,16 @@ describe('Media Service - Authorization Matrix', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(MinioService)
+      .useValue(mockMinioService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    minioService = moduleFixture.get<MinioService>(MinioService);
 
     // Create test media files (unique keys to avoid constraint across runs)
     const uniq = `test-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
