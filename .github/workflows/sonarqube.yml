@@ -21,7 +21,7 @@ on:
       - 'jest.config.js'
 
 env:
-  SONAR_PROJECT_KEY: cesi-collector-shop
+  SONAR_PROJECT_KEY: alexandre-kakal_cesi-collector-shop
 
 jobs:
   sonarqube:
