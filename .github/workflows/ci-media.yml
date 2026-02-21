@@ -105,8 +105,13 @@ jobs:
       - name: Wait for MinIO
         run: |
           for i in $(seq 1 30); do
-            curl -sf http://localhost:9000/minio/health/live && break
-            [ $i -eq 30 ] && exit 1
+            if curl -sf http://localhost:9000/minio/health/live; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "MinIO did not become ready in time"
+              exit 1
+            fi
             sleep 2
           done
 
