@@ -50,6 +50,29 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: auth_test
+        options: >-
+          --health-cmd pg_isready -U test
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,8 +94,13 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit -- --testPathPatterns=apps/auth
 
+      - name: Run Prisma migrations (auth)
+        run: npx prisma migrate deploy --config apps/auth/prisma.config.ts
+        env:
+          AUTH_DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+
       - name: Run integration tests
-        run: npm run test:integration -- --testPathPatterns=apps/auth
+        run: npm run test:integration -- --testPathPatterns="apps/auth.*integration-spec"
         env:
           AUTH_DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
 
