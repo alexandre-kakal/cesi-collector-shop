@@ -4,7 +4,7 @@ Configuration CI/CD automatique pour le monorepo CESI Collector Shop avec **path
 
 ## 📋 Vue d'ensemble
 
-Chaque microservice a son propre workflow CI/CD indépendant. Un workflow dédié gère SonarQube sur tout le repo :
+Chaque microservice a son propre workflow CI/CD indépendant. L’analyse SonarCloud est assurée par **Automatic Analysis** (à chaque push sur la branche par défaut), sans workflow dédié.
 
 | Workflow | Fichier | Déclenché par |
 |----------|---------|---------------|
@@ -12,11 +12,10 @@ Chaque microservice a son propre workflow CI/CD indépendant. Un workflow dédi�
 | Listing Service | `ci-listing.yml` | Changements dans `apps/listing/`, `libs/shared/`, `Dockerfile.listing` |
 | Media Service | `ci-media.yml` | Changements dans `apps/media/`, `libs/shared/`, `Dockerfile.media` |
 | Moderation Service | `ci-moderation.yml` | Changements dans `apps/moderation/`, `libs/shared/`, `Dockerfile.moderation` |
-| **SonarQube (full repo)** | `sonarqube.yml` | Changements dans `apps/`, `libs/`, `package.json`, `jest.config.js` |
 
 ## 🔧 Pipeline par Service
 
-Chaque workflow CI/CD exécute **6 jobs** (lint, test, security, build, update-manifests, notify). **SonarQube** est géré par un workflow séparé (`sonarqube.yml`) qui analyse tout le repo avec **un seul projet** SonarQube/SonarCloud.
+Chaque workflow CI/CD exécute **6 jobs** (lint, test, security, build, update-manifests, notify). **SonarCloud** analyse le repo via **Automatic Analysis** (à chaque push sur la branche par défaut).
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -43,7 +42,7 @@ Chaque workflow CI/CD exécute **6 jobs** (lint, test, security, build, update-m
          │     (Discord)           │
          └─────────────────────────┘
 
-SonarQube (workflow séparé) : analyse apps + libs → 1 projet cesi-collector-shop
+SonarCloud : Automatic Analysis sur la branche par défaut (pas de workflow CI dédié).
 ```
 
 ## ⚙️ Configuration des Secrets
@@ -59,18 +58,9 @@ Les images sont poussées sur **GitHub Container Registry (ghcr.io)**. Aucun sec
 - **Registry** : `ghcr.io`
 - **Images** : `ghcr.io/<owner>/cesi-shop-auth`, `cesi-shop-listing`, `cesi-shop-media`, `cesi-shop-moderation`
 
-#### 2. SonarQube
+#### 2. SonarCloud (qualité de code)
 
-```yaml
-SONAR_TOKEN: "your-sonarqube-token"
-SONAR_HOST_URL: "https://sonarcloud.io"  # ou votre instance SonarQube
-```
-
-**Comment obtenir :**
-1. Créer un compte sur [SonarCloud.io](https://sonarcloud.io)
-2. Créer une organisation
-3. Générer un token : My Account → Security → Generate Token
-4. Créer **un projet** pour tout le repo (clé : `cesi-collector-shop`). Le workflow `sonarqube.yml` envoie l’analyse de tout le repo vers ce projet.
+Aucun secret GitHub n’est requis pour SonarCloud : l’analyse est faite par **Automatic Analysis** (à chaque push sur la branche par défaut). Configurer le projet sur [sonarcloud.io](https://sonarcloud.io) et lier le repo GitHub ; les analyses se déclenchent automatiquement.
 
 #### 3. Snyk Security
 
@@ -156,9 +146,9 @@ npm run test:cov -- --testPathPatterns=apps/auth
 
 Les résultats sont uploadés dans **GitHub Security** (Code Scanning Alerts).
 
-### ✅ SonarQube Code Quality (workflow dédié)
+### ✅ SonarCloud (Automatic Analysis)
 
-Le workflow **`sonarqube.yml`** analyse tout le repo avec **un seul projet** SonarQube/SonarCloud (`cesi-collector-shop`). Analyse de la qualité du code :
+**SonarCloud** analyse le repo via **Automatic Analysis** à chaque push sur la branche par défaut (pas de workflow CI). Qualité du code :
 - Code smells
 - Bugs potentiels
 - Vulnérabilités
@@ -215,7 +205,7 @@ Push vers develop
 1-3. Lint, Test, Security ✓
 4. Build & Push Docker avec tag "develop-abc1234" ✓
 5. Update k8s/apps/*.yaml avec le nouveau tag ✓
-(+ SonarQube en parallèle via sonarqube.yml)
+(SonarCloud : Automatic Analysis sur la branche par défaut)
     ↓
 ArgoCD sync vers environnement de staging
 ```
@@ -232,7 +222,7 @@ Push vers main
    - v1.2.3 (si tag git)
 5. Update k8s/apps/*.yaml ✓
 6. Notification Discord ✓
-(+ SonarQube en parallèle via sonarqube.yml)
+(SonarCloud : Automatic Analysis sur la branche par défaut)
     ↓
 ArgoCD sync vers production
 ```
@@ -254,9 +244,9 @@ Allez dans **Security → Code scanning** pour voir :
 - 📦 Dépendances à risque
 - ⚠️ Severité (Critical, High, Medium, Low)
 
-### SonarQube Dashboard
+### SonarCloud Dashboard
 
-Connectez-vous à SonarCloud.io pour voir :
+Connectez-vous à [SonarCloud.io](https://sonarcloud.io) pour voir (analyse automatique à chaque push sur la branche par défaut) :
 - 📈 Évolution de la qualité du code
 - 🐛 Bugs à corriger
 - 🔥 Code smells
@@ -281,7 +271,7 @@ git push origin feat/add-new-endpoint
 # ✅ Lint
 # ✅ Tests
 # ✅ Security
-# ✅ SonarQube
+# ✅ SonarCloud (Automatic Analysis)
 # ❌ Pas de build (car c'est une feature branch)
 
 # 5. Créer une Pull Request
@@ -333,7 +323,7 @@ docker build -f Dockerfile.auth -t test:latest .
 # Workflow permissions : Read and write
 ```
 
-### SonarQube quality gate failed
+### SonarCloud quality gate failed
 
 **Cause** : Code ne respecte pas les standards de qualité.
 
@@ -379,7 +369,7 @@ trivy image your-image:latest
 3. ✅ **Créer des PR** plutôt que push direct sur main
 4. ✅ **Vérifier les Security Alerts** régulièrement
 5. ✅ **Maintenir la couverture de tests** > 80%
-6. ✅ **Corriger les issues SonarQube** rapidement
+6. ✅ **Corriger les issues SonarCloud** rapidement
 7. ✅ **Utiliser semantic versioning** pour les tags
 8. ✅ **Monitorer les durées de build** et optimiser si > 10min
 
