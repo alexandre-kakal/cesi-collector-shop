@@ -141,9 +141,9 @@ npx prettier --check "apps/auth/**/*.ts"
 - **Coverage** : Rapport de couverture envoyé à Codecov
 
 ```bash
-npm run test:unit -- --testPathPattern=apps/auth
-npm run test:integration -- --testPathPattern=apps/auth
-npm run test:cov -- --testPathPattern=apps/auth
+npm run test:unit -- --testPathPatterns=apps/auth
+npm run test:integration -- --testPathPatterns=apps/auth
+npm run test:cov -- --testPathPatterns=apps/auth
 ```
 
 ### ✅ Security Scans

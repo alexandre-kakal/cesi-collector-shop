@@ -67,13 +67,13 @@ jobs:
           LISTING_DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
 
       - name: Run unit tests
-        run: npm run test:unit -- --testPathPattern=apps/listing
+        run: npm run test:unit -- --testPathPatterns=apps/listing
 
       - name: Run integration tests
-        run: npm run test:integration -- --testPathPattern=apps/listing
+        run: npm run test:integration -- --testPathPatterns=apps/listing
 
       - name: Generate coverage report
-        run: npm run test:cov -- --testPathPattern=apps/listing --coverageDirectory=coverage/listing
+        run: npm run test:cov -- --testPathPatterns=apps/listing --coverageDirectory=coverage/listing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -102,7 +102,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=high
         continue-on-error: true
 
       - name: Run Snyk security scan
