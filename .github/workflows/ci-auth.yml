@@ -63,11 +63,11 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: auth_test
+          POSTGRES_USER: collector
+          POSTGRES_PASSWORD: collector123
+          POSTGRES_DB: cesi_auth_test
         options: >-
-          --health-cmd "pg_isready -U test"
+          --health-cmd "pg_isready -U collector"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -97,12 +97,12 @@ jobs:
       - name: Run Prisma migrations (auth)
         run: npx prisma migrate deploy --config apps/auth/prisma.config.ts
         env:
-          AUTH_DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+          AUTH_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_auth_test
 
       - name: Run integration tests
         run: npm run test:integration -- --testPathPatterns="apps/auth.*integration-spec"
         env:
-          AUTH_DATABASE_URL: postgresql://test:test@localhost:5432/auth_test
+          AUTH_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_auth_test
 
       - name: Generate coverage report
         run: npm run test:cov -- --testPathPatterns=apps/auth --coverageDirectory=coverage/auth
