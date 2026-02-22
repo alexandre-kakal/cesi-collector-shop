@@ -27,3 +27,6 @@ data:
 
   # Node environment
   NODE_ENV: "production"
+
+  # Better Auth: URL publique du front / ingress (évite l’avertissement et les refus CSRF)
+  BETTER_AUTH_URL: "http://cesi-shop.local"

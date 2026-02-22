@@ -14,17 +14,15 @@ export class AuthController {
 
   @All('/api/auth/sign-in/email')
   async handleSignIn(@Req() req: Request, @Res() res: Response) {
-    // Intercept better-auth response to add JWT tokens
     const originalJson = res.json.bind(res);
+    const authService = this.authService;
+    const logger = this.logger;
 
     res.json = function (body: any) {
-      // If sign-in was successful, add JWT tokens
       if (body && body.user && body.session) {
         const userId = body.user.id;
         const email = body.user.email;
         const role = (body.user.role as Role) || Role.BUYER;
-
-        // Generate tokens asynchronously
         authService.generateTokens(userId, email, role).then((tokens) => {
           body.tokens = tokens;
           originalJson(body);
@@ -37,8 +35,6 @@ export class AuthController {
       }
     } as any;
 
-    const authService = this.authService;
-    const logger = this.logger;
     return this.handler(req, res);
   }
 

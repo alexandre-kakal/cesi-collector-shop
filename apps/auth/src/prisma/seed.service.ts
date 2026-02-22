@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { hashSync } from 'bcryptjs';
+import * as argon2 from 'argon2';
 import { SEED_IDS } from '@app/shared';
 import { PrismaService } from './prisma.service';
 
@@ -10,7 +10,7 @@ export class SeedService {
   async run(): Promise<void> {
     const { userAdmin, userSeller, userBuyer } = SEED_IDS.auth;
     const now = new Date();
-    const defaultPasswordHash = hashSync('Password123!', 10);
+    const defaultPasswordHash = await argon2.hash('Password123!');
 
     await this.prisma.user.upsert({
       where: { id: userAdmin },
