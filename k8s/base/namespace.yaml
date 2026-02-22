@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cesi-shop
+  labels:
+    name: cesi-shop
+    app: cesi-collector-shop

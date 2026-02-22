@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: cesi-shop
+  labels:
+    app: auth-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z postgres-auth 5432; do echo waiting for postgres; sleep 2; done;']
+      - name: prisma-migrate
+        image: YOUR_REGISTRY/cesi-shop-auth:latest  # À remplacer par votre registry
+        command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './apps/auth/prisma.config.ts']
+        env:
+        - name: AUTH_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: AUTH_DATABASE_URL
+      containers:
+      - name: auth
+        image: YOUR_REGISTRY/cesi-shop-auth:latest  # À remplacer par votre registry
+        ports:
+        - containerPort: 3010
+        env:
+        - name: AUTH_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AUTH_PORT
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: AUTH_DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: JWT_SECRET
+        - name: JWT_EXPIRES_IN
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: JWT_EXPIRES_IN
+        - name: BETTER_AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: JWT_SECRET
+        - name: JWT_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: JWT_PRIVATE_KEY
+        - name: JWT_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: JWT_PUBLIC_KEY
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: NODE_ENV
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3010
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3010
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: cesi-shop
+  labels:
+    app: auth-service
+spec:
+  selector:
+    app: auth-service
+  ports:
+  - port: 3010
+    targetPort: 3010
+    name: http
+  type: ClusterIP

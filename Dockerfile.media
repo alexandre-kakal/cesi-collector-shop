@@ -39,6 +39,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Copy Prisma schema + migrations + config (Prisma 7: url dans prisma.config.ts)
+COPY --from=builder /app/apps/media/src/prisma ./apps/media/src/prisma
+COPY --from=builder /app/apps/media/prisma.config.ts ./apps/media/prisma.config.ts
+
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
@@ -51,4 +55,4 @@ USER appuser
 EXPOSE 3050
 
 # Start the application (MEDIA_DATABASE_URL must be set at runtime)
-CMD ["node", "dist/apps/media/main.js"]
+CMD ["node", "dist/apps/media/apps/media/src/main.js"]

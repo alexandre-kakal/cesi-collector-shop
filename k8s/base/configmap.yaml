@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: cesi-shop
+data:
+  # Service ports
+  AUTH_PORT: "3010"
+  LISTING_PORT: "3020"
+  MEDIA_PORT: "3050"
+  MODERATION_PORT: "3030"
+
+  # RabbitMQ configuration
+  RABBITMQ_URL: "amqp://rabbitmq:5672"
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+
+  # Redis configuration
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  # MinIO configuration
+  MINIO_ENDPOINT: "minio"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET_NAME: "media-uploads"
+
+  # Node environment
+  NODE_ENV: "production"

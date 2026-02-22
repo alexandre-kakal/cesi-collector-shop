@@ -1,0 +1,76 @@
+# Force IfNotPresent pour utiliser les images chargées avec minikube image load (évite ImagePullBackOff)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          imagePullPolicy: IfNotPresent
+        - name: prisma-migrate
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: auth
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: listing-service
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          imagePullPolicy: IfNotPresent
+        - name: wait-for-rabbitmq
+          imagePullPolicy: IfNotPresent
+        - name: prisma-migrate
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: listing
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-service
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          imagePullPolicy: IfNotPresent
+        - name: wait-for-rabbitmq
+          imagePullPolicy: IfNotPresent
+        - name: wait-for-minio
+          imagePullPolicy: IfNotPresent
+        - name: prisma-migrate
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: media
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moderation-service
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          imagePullPolicy: IfNotPresent
+        - name: wait-for-rabbitmq
+          imagePullPolicy: IfNotPresent
+        - name: prisma-migrate
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: moderation
+          imagePullPolicy: IfNotPresent

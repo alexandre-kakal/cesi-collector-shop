@@ -39,6 +39,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Copy Prisma schema + migrations + config (Prisma 7: url dans prisma.config.ts)
+COPY --from=builder /app/apps/listing/src/prisma ./apps/listing/src/prisma
+COPY --from=builder /app/apps/listing/prisma.config.ts ./apps/listing/prisma.config.ts
+
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
@@ -51,4 +55,4 @@ USER appuser
 EXPOSE 3020
 
 # Start the application (LISTING_DATABASE_URL must be set at runtime)
-CMD ["node", "dist/apps/listing/main.js"]
+CMD ["node", "dist/apps/listing/apps/listing/src/main.js"]

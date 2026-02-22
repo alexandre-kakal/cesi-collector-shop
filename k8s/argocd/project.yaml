@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: cesi-shop
+  namespace: argocd
+spec:
+  description: CESI Collector Shop Microservices Platform
+
+  # Source repositories
+  sourceRepos:
+  - '*'  # À restreindre à votre repo Git en production
+
+  # Destinations autorisées
+  destinations:
+  - namespace: cesi-shop
+    server: https://kubernetes.default.svc
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: 'apps'
+    kind: '*'
+  - group: 'networking.k8s.io'
+    kind: '*'
+  - group: 'batch'
+    kind: '*'
+
+  # Sync windows (optional)
+  # syncWindows:
+  # - kind: allow
+  #   schedule: '* * * * *'
+  #   duration: 24h
+  #   applications:
+  #   - '*'

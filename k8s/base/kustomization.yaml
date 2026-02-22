@@ -1,0 +1,9 @@
+# Kustomization de base - utilisé par ArgoCD (CMP SOPS déchiffre secrets.enc.yaml -> secrets.yaml puis build)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml   # Généré par le CMP SOPS à partir de secrets.enc.yaml (ArgoCD) ou par sops -d (local)
+  - ingress.yaml

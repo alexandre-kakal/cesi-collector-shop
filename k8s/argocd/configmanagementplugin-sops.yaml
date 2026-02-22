@@ -1,0 +1,30 @@
+# Configuration du plugin SOPS pour ArgoCD
+# ---------------------------------------
+# À fusionner dans la ConfigMap argocd-cm (namespace argocd).
+#
+# Méthode : kubectl edit configmap argocd-cm -n argocd
+# Puis ajouter sous "data:" la clé configManagementPlugins avec le bloc ci-dessous.
+# Si configManagementPlugins existe déjà, ajouter l'entrée "sops" à la liste.
+#
+# Prérequis sur le repo server ArgoCD :
+#   - sops et age installés (image custom ou sidecar)
+#   - Secret age-key-secret monté en /tmp/age/age.key
+#   - Env SOPS_AGE_KEY_FILE=/tmp/age/age.key
+#
+# Voir docs/SOPS-MIGRATION.md pour les étapes complètes.
+#
+# --- Début du bloc à copier dans argocd-cm.data ---
+#
+# configManagementPlugins: |
+#   - name: sops
+#     generate:
+#       command: ["/bin/sh", "-c"]
+#       args:
+#         - |
+#           set -e
+#           if [ -n "$SOPS_AGE_KEY_FILE" ] && [ -f "secrets.enc.yaml" ]; then
+#             sops -d secrets.enc.yaml > secrets.yaml 2>/dev/null || true
+#           fi
+#           kustomize build .
+#
+# --- Fin du bloc ---

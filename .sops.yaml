@@ -1,0 +1,7 @@
+# Configuration SOPS pour le projet
+# Remplacer la clé age ci-dessous par VOTRE clé publique (grep "public key:" ~/.config/sops/age/keys.txt)
+creation_rules:
+  # Fichier en clair (chiffrement) ou chiffré (édition) : sops --encrypt secrets.yaml > secrets.enc.yaml
+  - path_regex: k8s/.*/secrets(\.enc)?\.yaml$
+    age: >-
+      age1tnywfxx9s2tfn8f48gvhed2vjgnedn6md6yg2l6gqm3semh2x9tqqpq5xu

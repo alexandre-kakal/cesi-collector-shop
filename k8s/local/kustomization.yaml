@@ -1,0 +1,50 @@
+# Kustomization pour environnement local (Minikube/Kind)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cesi-shop
+
+resources:
+  - ../base/namespace.yaml
+  - ../base/configmap.yaml
+  - ../base/secrets.yaml
+  - ../infrastructure/postgresql-auth.yaml
+  - ../infrastructure/postgresql-listing.yaml
+  - ../infrastructure/postgresql-media.yaml
+  - ../infrastructure/postgresql-moderation.yaml
+  - ../infrastructure/rabbitmq.yaml
+  - ../infrastructure/redis.yaml
+  - ../infrastructure/minio.yaml
+  - ../apps/auth.yaml
+  - ../apps/listing.yaml
+  - ../apps/media.yaml
+  - ../apps/moderation.yaml
+  - ../base/ingress.yaml
+
+# Patches pour l'environnement local
+patchesStrategicMerge:
+  - replicas-patch.yaml
+  - resources-patch.yaml
+
+# Configuration pour le local
+configMapGenerator:
+  - name: local-config
+    namespace: cesi-shop
+    literals:
+      - ENV=local
+      - DEBUG=true
+
+# Images (à remplacer par votre registry local)
+images:
+  - name: YOUR_REGISTRY/cesi-shop-auth
+    newName: localhost:32770/cesi-shop-auth
+    newTag: dev
+  - name: YOUR_REGISTRY/cesi-shop-listing
+    newName: localhost:32770/cesi-shop-listing
+    newTag: dev
+  - name: YOUR_REGISTRY/cesi-shop-media
+    newName: localhost:32770/cesi-shop-media
+    newTag: dev
+  - name: YOUR_REGISTRY/cesi-shop-moderation
+    newName: localhost:32770/cesi-shop-moderation
+    newTag: dev

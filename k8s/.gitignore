@@ -1,0 +1,22 @@
+# Secrets - Ne jamais committer!
+secrets.prod.yaml
+*-secrets.yaml
+*.key
+*.pem
+# Fichier de secrets en clair (déchiffré localement ou par ArgoCD ; généré à partir de secrets.enc.yaml)
+base/secrets.yaml
+
+# Environnements spécifiques
+local/*.local.yaml
+staging/*.staging.yaml
+production/*.prod.yaml
+
+# Backups
+*.backup
+*.sql
+backups/
+
+# Temporary files
+*.tmp
+*.swp
+*~
