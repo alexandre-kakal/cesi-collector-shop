@@ -2,22 +2,22 @@ name: CI/CD - Auth Service
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
-      - 'apps/auth/**'
-      - 'libs/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile.auth'
-      - '.github/workflows/ci-auth.yml'
+      - "apps/auth/**"
+      - "libs/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile.auth"
+      - ".github/workflows/ci-auth.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
-      - 'apps/auth/**'
-      - 'libs/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile.auth'
+      - "apps/auth/**"
+      - "libs/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile.auth"
 
 env:
   SERVICE_NAME: auth
@@ -34,8 +34,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -80,8 +80,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -135,8 +135,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -156,16 +156,16 @@ jobs:
       - name: Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: 'apps/auth'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: "fs"
+          scan-ref: "apps/auth"
+          format: "sarif"
+          output: "trivy-results.sarif"
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
   # Job 4: Build Docker Image
   build:
@@ -233,14 +233,14 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
+          format: "sarif"
+          output: "trivy-image-results.sarif"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-image-results.sarif'
+          sarif_file: "trivy-image-results.sarif"
 
   # Job 5: Update Kubernetes Manifests (for ArgoCD) - désactivé
   # update-manifests:

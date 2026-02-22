@@ -2,7 +2,7 @@ name: CI/CD - Media Service
 # test
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "apps/media/**"
       - "libs/shared/**"
@@ -11,7 +11,7 @@ on:
       - "Dockerfile.media"
       - ".github/workflows/ci-media.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "apps/media/**"
       - "libs/shared/**"
