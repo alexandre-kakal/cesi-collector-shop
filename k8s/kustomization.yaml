@@ -21,6 +21,11 @@ resources:
   - apps/listing.yaml
   - apps/media.yaml
   - apps/moderation.yaml
+  # Jobs de seed (une seule exécution par Job ; ordre recommandé : auth → media → listing → moderation)
+  - jobs/seed-auth-job.yaml
+  - jobs/seed-media-job.yaml
+  - jobs/seed-listing-job.yaml
+  - jobs/seed-moderation-job.yaml
 
 patches:
   - path: local/replicas-patch.yaml
