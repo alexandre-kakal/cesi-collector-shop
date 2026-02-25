@@ -22,18 +22,23 @@ spec:
           image: busybox:1.36
           command: ['sh', '-c', 'until nc -z postgres-auth 5432; do echo waiting for postgres-auth; sleep 2; done; echo postgres-auth ready']
         - name: prisma-migrate
-          image: YOUR_REGISTRY/cesi-shop-auth:dev
-          workingDir: /app/apps/auth
-          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './prisma.config.ts']
+          image: cesi-shop-auth:dev
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', 'apps/auth/prisma.config.ts']
           env:
             - name: AUTH_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: database-secrets
                   key: AUTH_DATABASE_URL
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z redis 6379; do echo waiting for redis; sleep 2; done; echo redis ready']
       containers:
         - name: seed
-          image: YOUR_REGISTRY/cesi-shop-auth:dev
+          image: cesi-shop-auth:dev
+          imagePullPolicy: IfNotPresent
           command: ['node', 'dist/apps/auth/apps/auth/src/seed-runner.js']
           securityContext:
             runAsUser: 1001
@@ -54,11 +59,26 @@ spec:
                 secretKeyRef:
                   name: database-secrets
                   key: AUTH_DATABASE_URL
-            - name: BETTER_AUTH_SECRET
+            - name: AUTH_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: AUTH_DATABASE_URL
+            - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: jwt-secrets
                   key: JWT_SECRET
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_PORT
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:

@@ -5,7 +5,8 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { AuthService } from '../src/auth/auth.service';
 import { RedisModule } from '../src/redis/redis.module';
 import { RedisService } from '../src/redis/redis.service';
-import { Role } from '@app/shared';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { Role, RABBITMQ_CLIENT_TOKEN } from '@app/shared';
 
 describe('Auth Service - JWT Integration', () => {
   let app: INestApplication;
@@ -28,12 +29,8 @@ describe('Auth Service - JWT Integration', () => {
       ],
       providers: [
         AuthService,
-        {
-          provide: 'RABBITMQ_CLIENT',
-          useValue: {
-            emit: jest.fn(),
-          },
-        },
+        { provide: RABBITMQ_CLIENT_TOKEN, useValue: { emit: jest.fn() } },
+        { provide: PrismaService, useValue: {} },
       ],
     }).compile();
 
@@ -213,11 +210,7 @@ describe('Auth Service - JWT Integration', () => {
 
     it('should maintain separate refresh tokens for different users', async () => {
       const user1Tokens = await authService.generateTokens('user1', 'user1@test.com', Role.BUYER);
-      const user2Tokens = await authService.generateTokens(
-        'user2',
-        'user2@test.com',
-        Role.SELLER,
-      );
+      const user2Tokens = await authService.generateTokens('user2', 'user2@test.com', Role.SELLER);
 
       await authService.revokeToken(user1Tokens.refreshToken);
 

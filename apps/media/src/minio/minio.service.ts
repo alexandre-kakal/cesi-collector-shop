@@ -63,7 +63,12 @@ export class MinioService implements OnModuleInit {
     await this.client.removeObject(this.bucket, key);
   }
 
+  /** URL accessible depuis le navigateur (via proxy nginx ou direct MinIO) */
   getPublicUrl(key: string): string {
+    const publicBase = this.configService.get<string>('MINIO_PUBLIC_BASE_URL');
+    if (publicBase) {
+      return `${publicBase.replace(/\/$/, '')}/${this.bucket}/${key}`;
+    }
     const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
     const port = this.configService.get<number>('MINIO_PORT', 9000);
     return `http://${endpoint}:${port}/${this.bucket}/${key}`;

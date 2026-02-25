@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { RedisService } from '../redis/redis.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { RABBITMQ_CLIENT_TOKEN, RABBITMQ_ROUTING_KEYS, Role } from '@app/shared';
 
 describe('AuthService (unit)', () => {
@@ -25,6 +26,10 @@ describe('AuthService (unit)', () => {
     del: jest.fn(),
     exists: jest.fn(),
   };
+  const mockPrisma = {
+    user: { findUnique: jest.fn(), create: jest.fn() },
+    account: { findFirst: jest.fn(), create: jest.fn() },
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -34,6 +39,7 @@ describe('AuthService (unit)', () => {
         { provide: RABBITMQ_CLIENT_TOKEN, useValue: mockRmq },
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();
 

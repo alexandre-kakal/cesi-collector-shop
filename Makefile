@@ -8,7 +8,7 @@ TAG ?= dev
 NAMESPACE = cesi-shop
 
 .PHONY: help minikube-start minikube-status build-images minikube-load \
-	sops-decrypt k8s-apply k8s-delete k8s-status k8s-local \
+	sops-decrypt k8s-apply k8s-delete k8s-status k8s-local k8s-local-start \
 	argocd-install argocd-apps argocd argocd-password argocd-ui \
 	k8s-deploy validate
 
@@ -34,6 +34,7 @@ help:
 	@echo "  k8s-delete        Supprimer les ressources déployées"
 	@echo "  k8s-status       Afficher pods/svc du namespace $(NAMESPACE)"
 	@echo "  k8s-local         Tout en un: sops-decrypt + minikube-start + build + load + k8s-apply"
+	@echo "  k8s-local-start   Redémarrer le déploiement (minikube + sops-decrypt + k8s-apply, sans rebuild images)"
 	@echo ""
 	@echo "ArgoCD:"
 	@echo "  argocd-install    Installer ArgoCD dans le cluster"
@@ -68,18 +69,28 @@ minikube-status:
 # ─────────────────────────────────────────────
 build-images:
 	@echo "🔨 Building Docker images $(REGISTRY) tag=$(TAG)..."
-	docker build -f Dockerfile.auth -t $(REGISTRY)/cesi-shop-auth:$(TAG) .
-	docker build -f Dockerfile.listing -t $(REGISTRY)/cesi-shop-listing:$(TAG) .
-	docker build -f Dockerfile.media -t $(REGISTRY)/cesi-shop-media:$(TAG) .
-	docker build -f Dockerfile.moderation -t $(REGISTRY)/cesi-shop-moderation:$(TAG) .
-	@echo "✅ All images built."
+	docker build -f Dockerfile.auth -t cesi-shop-auth:$(TAG) .
+	docker build -f Dockerfile.listing -t cesi-shop-listing:$(TAG) .
+	docker build -f Dockerfile.media -t cesi-shop-media:$(TAG) .
+	docker build -f Dockerfile.moderation -t cesi-shop-moderation:$(TAG) .
+	@echo "✅ Backend images built."
 
-minikube-load: build-images
+build-frontend:
+	@echo "🔨 Building frontend (VITE_API_URL=http://cesi-shop.local)..."
+	docker build -f ../cesi-collector-shop-front/Dockerfile \
+		--build-arg VITE_API_URL=http://cesi-shop.local \
+		-t cesi-shop-frontend:$(TAG) ../cesi-collector-shop-front/
+	@echo "✅ Frontend image built."
+
+build-all: build-images build-frontend
+
+minikube-load: build-all
 	@echo "📤 Loading images into Minikube..."
-	minikube image load $(REGISTRY)/cesi-shop-auth:$(TAG)
-	minikube image load $(REGISTRY)/cesi-shop-listing:$(TAG)
-	minikube image load $(REGISTRY)/cesi-shop-media:$(TAG)
-	minikube image load $(REGISTRY)/cesi-shop-moderation:$(TAG)
+	minikube image load cesi-shop-auth:$(TAG)
+	minikube image load cesi-shop-listing:$(TAG)
+	minikube image load cesi-shop-media:$(TAG)
+	minikube image load cesi-shop-moderation:$(TAG)
+	minikube image load cesi-shop-frontend:$(TAG)
 	@echo "✅ Images loaded."
 
 # ─────────────────────────────────────────────
@@ -112,10 +123,18 @@ k8s-status:
 	@echo "Services:"
 	kubectl get svc -n $(NAMESPACE)
 
-k8s-local: sops-decrypt minikube-start minikube-load
+k8s-local: minikube-start minikube-load
 	@echo "🚀 Deploying to Minikube..."
 	kubectl apply -k k8s/
 	@echo "✅ Local setup complete. make k8s-status  |  Add to /etc/hosts: $$(minikube ip) cesi-shop.local"
+
+k8s-local-start:
+	@echo "▶ Starting Minikube (if needed)..."
+	@minikube status >/dev/null 2>&1 || $(MAKE) minikube-start
+	@if [ -f k8s/base/secrets.enc.yaml ]; then $(MAKE) sops-decrypt; fi
+	@echo "🚀 Applying manifests..."
+	kubectl apply -k k8s/
+	@echo "✅ Local setup started. make k8s-status  |  Add to /etc/hosts: $$(minikube ip) cesi-shop.local"
 
 # ─────────────────────────────────────────────
 # ArgoCD

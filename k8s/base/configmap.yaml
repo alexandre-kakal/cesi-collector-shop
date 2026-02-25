@@ -10,8 +10,7 @@ data:
   MEDIA_PORT: "3050"
   MODERATION_PORT: "3030"
 
-  # RabbitMQ configuration
-  RABBITMQ_URL: "amqp://rabbitmq:5672"
+  # RabbitMQ configuration (URL avec credentials dans secrets)
   RABBITMQ_HOST: "rabbitmq"
   RABBITMQ_PORT: "5672"
 
@@ -24,6 +23,10 @@ data:
   MINIO_PORT: "9000"
   MINIO_USE_SSL: "false"
   MINIO_BUCKET_NAME: "media-uploads"
+  MINIO_PUBLIC_BASE_URL: "http://cesi-shop.local/api/v1/media/files"
+
+  # Service-to-service (cluster interne)
+  MEDIA_SERVICE_URL: "http://media-service:3050"
 
   # Node environment
   NODE_ENV: "production"

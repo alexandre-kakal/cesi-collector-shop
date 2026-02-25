@@ -1,5 +1,3 @@
-import * as path from 'path';
-import * as fs from 'fs';
 import { JwtService } from '@nestjs/jwt';
 import { Role, JwtPayload } from '@app/shared';
 
@@ -37,22 +35,20 @@ export const TEST_USERS: Record<string, TestUser> = {
   },
 };
 
-/** Load JWT private key for signing test tokens (RS256). Apps verify with JWT_PUBLIC_KEY. */
-function getTestPrivateKey(): string {
-  const fromEnv = process.env.JWT_PRIVATE_KEY;
-  if (fromEnv) return fromEnv.replace(/\\n/g, '\n');
-  const keyPath = path.resolve(process.cwd(), 'test', 'keys', 'test-private.pem');
-  if (fs.existsSync(keyPath)) return fs.readFileSync(keyPath, 'utf8');
+/** Load JWT secret for signing test tokens (HS256). */
+function getTestJwtSecret(): string {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv) return fromEnv;
   throw new Error(
-    'JWT_PRIVATE_KEY not set and test/keys/test-private.pem not found. Copy .env.test.example to .env.test and set JWT keys, or run the project from repo root.',
+    'JWT_SECRET not set. Copy .env.test.example to .env.test and set JWT_SECRET, or run the project from repo root.',
   );
 }
 
 export function generateTestToken(user: TestUser, expiresIn: string | number = '1h'): string {
-  const privateKey = getTestPrivateKey();
+  const secret = getTestJwtSecret();
   const jwtService = new JwtService({
-    privateKey,
-    signOptions: { algorithm: 'RS256' as const },
+    secret,
+    signOptions: { algorithm: 'HS256' as const },
   });
 
   const payload: JwtPayload = {

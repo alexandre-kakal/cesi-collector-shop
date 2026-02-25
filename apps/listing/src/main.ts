@@ -33,7 +33,7 @@ async function bootstrap() {
       queue: 'listing.moderation-events',
       exchange: 'listings.exchange',
       exchangeType: 'topic',
-      routingKey: 'listing.approved,listing.rejected',
+      routingKey: 'listing.*',
       noAck: true,
       queueOptions: { durable: true },
     },

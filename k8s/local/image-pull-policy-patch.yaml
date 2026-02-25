@@ -10,8 +10,6 @@ spec:
       initContainers:
         - name: wait-for-postgres
           imagePullPolicy: IfNotPresent
-        - name: prisma-migrate
-          imagePullPolicy: IfNotPresent
       containers:
         - name: auth
           imagePullPolicy: IfNotPresent
@@ -28,8 +26,6 @@ spec:
         - name: wait-for-postgres
           imagePullPolicy: IfNotPresent
         - name: wait-for-rabbitmq
-          imagePullPolicy: IfNotPresent
-        - name: prisma-migrate
           imagePullPolicy: IfNotPresent
       containers:
         - name: listing
@@ -50,8 +46,6 @@ spec:
           imagePullPolicy: IfNotPresent
         - name: wait-for-minio
           imagePullPolicy: IfNotPresent
-        - name: prisma-migrate
-          imagePullPolicy: IfNotPresent
       containers:
         - name: media
           imagePullPolicy: IfNotPresent
@@ -69,8 +63,32 @@ spec:
           imagePullPolicy: IfNotPresent
         - name: wait-for-rabbitmq
           imagePullPolicy: IfNotPresent
-        - name: prisma-migrate
-          imagePullPolicy: IfNotPresent
       containers:
         - name: moderation
+          imagePullPolicy: IfNotPresent
+---
+# Frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          imagePullPolicy: IfNotPresent
+---
+# MinIO : IfNotPresent pour éviter ImagePullBackOff
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: cesi-shop
+spec:
+  template:
+    spec:
+      containers:
+        - name: minio
           imagePullPolicy: IfNotPresent

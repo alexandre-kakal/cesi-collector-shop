@@ -105,7 +105,14 @@ export class MediaService {
       include: { variants: true },
     });
     if (!media) throw new NotFoundException(`Media ${id} not found`);
-    return media;
+    return {
+      ...media,
+      originalUrl: this.minioService.getPublicUrl(media.storageKey),
+      variants: media.variants.map((v) => ({
+        ...v,
+        url: this.minioService.getPublicUrl(v.storageKey),
+      })),
+    };
   }
 
   async checkOwnership(mediaId: string, userId: string): Promise<boolean> {

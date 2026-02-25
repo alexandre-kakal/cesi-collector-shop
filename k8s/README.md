@@ -52,6 +52,30 @@ Toutes les commandes passent par le **Makefile** (Minikube uniquement) : `make h
 - (Optionnel) ArgoCD installé
 - Docker registry pour stocker les images
 
+### Minikube (local)
+
+```bash
+# 1. Démarrer Minikube (une fois)
+make minikube-start
+
+# 2. Construire les images et charger dans Minikube
+make minikube-load
+
+# 3. Appliquer les manifests
+make k8s-apply
+
+# 4. Ajouter dans /etc/hosts (remplacer par l'IP affichée)
+echo "$(minikube ip) cesi-shop.local" | sudo tee -a /etc/hosts
+
+# 5. Attendre que les pods soient prêts
+kubectl get pods -n cesi-shop -w
+
+# 6. Lancer les migrations (si nécessaire)
+kubectl apply -f k8s/jobs/migrate-all.yaml -n cesi-shop
+```
+
+Accès : http://cesi-shop.local
+
 ### Option 1: Déploiement Manuel avec kubectl
 
 #### 1. Construire et pousser les images Docker

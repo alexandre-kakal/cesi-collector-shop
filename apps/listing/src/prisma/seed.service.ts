@@ -40,7 +40,7 @@ export class SeedService {
         price: 29.99,
         sellerId,
         categoryId: categoryFigurines,
-        status: 'PENDING',
+        status: 'APPROVED',
         photos: {
           create: [
             { mediaId: mediaPhoto1, order: 0 },
@@ -48,7 +48,7 @@ export class SeedService {
           ],
         },
       },
-      update: {},
+      update: { status: 'APPROVED' },
     });
 
     await this.prisma.listing.upsert({

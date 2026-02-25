@@ -18,18 +18,23 @@ spec:
           image: busybox:1.36
           command: ['sh', '-c', 'until nc -z postgres-moderation 5432; do echo waiting for postgres-moderation; sleep 2; done; echo postgres-moderation ready']
         - name: prisma-migrate
-          image: YOUR_REGISTRY/cesi-shop-moderation:dev
-          workingDir: /app/apps/moderation
-          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './prisma.config.ts']
+          image: cesi-shop-moderation:dev
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', 'apps/moderation/prisma.config.ts']
           env:
             - name: MODERATION_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: database-secrets
                   key: MODERATION_DATABASE_URL
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done; echo rabbitmq ready']
       containers:
         - name: seed
-          image: YOUR_REGISTRY/cesi-shop-moderation:dev
+          image: cesi-shop-moderation:dev
+          imagePullPolicy: IfNotPresent
           command: ['node', 'dist/apps/moderation/apps/moderation/src/seed-runner.js']
           securityContext:
             runAsUser: 1001
@@ -50,6 +55,16 @@ spec:
                 secretKeyRef:
                   name: database-secrets
                   key: MODERATION_DATABASE_URL
+            - name: MODERATION_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: MODERATION_DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secrets
+                  key: JWT_SECRET
             - name: JWT_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -57,8 +72,8 @@ spec:
                   key: JWT_PUBLIC_KEY
             - name: RABBITMQ_URL
               valueFrom:
-                configMapKeyRef:
-                  name: app-config
+                secretKeyRef:
+                  name: rabbitmq-secrets
                   key: RABBITMQ_URL
             - name: NODE_ENV
               valueFrom:

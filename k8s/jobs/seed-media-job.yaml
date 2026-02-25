@@ -18,18 +18,26 @@ spec:
           image: busybox:1.36
           command: ['sh', '-c', 'until nc -z postgres-media 5432; do echo waiting for postgres-media; sleep 2; done; echo postgres-media ready']
         - name: prisma-migrate
-          image: YOUR_REGISTRY/cesi-shop-media:dev
-          workingDir: /app/apps/media
-          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './prisma.config.ts']
+          image: cesi-shop-media:dev
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ['npx', 'prisma', 'migrate', 'deploy', '--config', 'apps/media/prisma.config.ts']
           env:
             - name: MEDIA_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: database-secrets
                   key: MEDIA_DATABASE_URL
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done; echo rabbitmq ready']
+        - name: wait-for-minio
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z minio 9000; do echo waiting for minio; sleep 2; done; echo minio ready']
       containers:
         - name: seed
-          image: YOUR_REGISTRY/cesi-shop-media:dev
+          image: cesi-shop-media:dev
+          imagePullPolicy: IfNotPresent
           command: ['node', 'dist/apps/media/apps/media/src/seed-runner.js']
           securityContext:
             runAsUser: 1001
@@ -50,6 +58,16 @@ spec:
                 secretKeyRef:
                   name: database-secrets
                   key: MEDIA_DATABASE_URL
+            - name: MEDIA_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: MEDIA_DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secrets
+                  key: JWT_SECRET
             - name: JWT_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -57,8 +75,8 @@ spec:
                   key: JWT_PUBLIC_KEY
             - name: RABBITMQ_URL
               valueFrom:
-                configMapKeyRef:
-                  name: app-config
+                secretKeyRef:
+                  name: rabbitmq-secrets
                   key: RABBITMQ_URL
             - name: MINIO_ENDPOINT
               valueFrom:

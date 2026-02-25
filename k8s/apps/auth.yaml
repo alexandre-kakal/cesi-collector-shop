@@ -19,18 +19,10 @@ spec:
       - name: wait-for-postgres
         image: busybox:1.36
         command: ['sh', '-c', 'until nc -z postgres-auth 5432; do echo waiting for postgres; sleep 2; done;']
-      - name: prisma-migrate
-        image: YOUR_REGISTRY/cesi-shop-auth:latest  # À remplacer par votre registry
-        command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './apps/auth/prisma.config.ts']
-        env:
-        - name: AUTH_DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: AUTH_DATABASE_URL
       containers:
       - name: auth
         image: YOUR_REGISTRY/cesi-shop-auth:latest  # À remplacer par votre registry
+        command: ["node", "dist/apps/auth/apps/auth/src/main.js"]
         ports:
         - containerPort: 3010
         env:
@@ -84,6 +76,16 @@ spec:
             configMapKeyRef:
               name: app-config
               key: NODE_ENV
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: REDIS_PORT
         resources:
           requests:
             memory: "256Mi"

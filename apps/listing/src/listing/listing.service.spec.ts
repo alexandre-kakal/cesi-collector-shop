@@ -17,6 +17,7 @@ describe('ListingService (unit)', () => {
     },
     listingPhoto: {
       create: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
   const mockRmq = { emit: jest.fn() };
@@ -240,6 +241,24 @@ describe('ListingService (unit)', () => {
     });
   });
 
+  describe('getNextPhotoOrder', () => {
+    it('should return 0 when no photos exist', async () => {
+      mockPrisma.listingPhoto.findFirst.mockResolvedValue(null);
+
+      const result = await service.getNextPhotoOrder('l1');
+
+      expect(result).toBe(0);
+    });
+
+    it('should return last order + 1 when photos exist', async () => {
+      mockPrisma.listingPhoto.findFirst.mockResolvedValue({ order: 2 });
+
+      const result = await service.getNextPhotoOrder('l1');
+
+      expect(result).toBe(3);
+    });
+  });
+
   describe('addPhoto', () => {
     it('should create listing photo with default order', async () => {
       const created = { listingId: 'l1', mediaId: 'm1', order: 0 };
@@ -254,7 +273,11 @@ describe('ListingService (unit)', () => {
     });
 
     it('should create listing photo with custom order', async () => {
-      mockPrisma.listingPhoto.create.mockResolvedValue({ listingId: 'l1', mediaId: 'm1', order: 2 });
+      mockPrisma.listingPhoto.create.mockResolvedValue({
+        listingId: 'l1',
+        mediaId: 'm1',
+        order: 2,
+      });
 
       await service.addPhoto('l1', 'm1', 2);
 

@@ -22,6 +22,7 @@ export class RabbitMQClientModule {
               queue: 'default',
               exchange: options.exchange,
               exchangeType: 'topic',
+              wildcards: true,
               noAck: true,
               queueOptions: {
                 durable: true,
@@ -54,6 +55,7 @@ export class RabbitMQClientModule {
                   queue: 'default',
                   exchange: config.exchange,
                   exchangeType: 'topic',
+                  wildcards: true,
                   noAck: true,
                   queueOptions: {
                     durable: true,

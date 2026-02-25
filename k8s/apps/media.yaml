@@ -25,18 +25,10 @@ spec:
       - name: wait-for-minio
         image: busybox:1.36
         command: ['sh', '-c', 'until nc -z minio 9000; do echo waiting for minio; sleep 2; done;']
-      - name: prisma-migrate
-        image: YOUR_REGISTRY/cesi-shop-media:latest  # À remplacer par votre registry
-        command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './apps/media/prisma.config.ts']
-        env:
-        - name: MEDIA_DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: MEDIA_DATABASE_URL
       containers:
       - name: media
         image: YOUR_REGISTRY/cesi-shop-media:latest  # À remplacer par votre registry
+        command: ["node", "dist/apps/media/apps/media/src/main.js"]
         ports:
         - containerPort: 3050
         env:
@@ -52,8 +44,8 @@ spec:
               key: MEDIA_DATABASE_URL
         - name: RABBITMQ_URL
           valueFrom:
-            configMapKeyRef:
-              name: app-config
+            secretKeyRef:
+              name: rabbitmq-secrets
               key: RABBITMQ_URL
         - name: MINIO_ENDPOINT
           valueFrom:
@@ -85,6 +77,11 @@ spec:
             configMapKeyRef:
               name: app-config
               key: MINIO_BUCKET_NAME
+        - name: MINIO_PUBLIC_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_PUBLIC_BASE_URL
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:

@@ -10,9 +10,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
+    const port = parseInt(String(this.configService.get('REDIS_PORT') ?? 6379), 10);
     this.client = new Redis({
       host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
+      port: isNaN(port) ? 6379 : port,
       password: this.configService.get<string>('REDIS_PASSWORD'),
       lazyConnect: true,
     });

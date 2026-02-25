@@ -1,5 +1,10 @@
-import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import path from 'path';
+import { config } from 'dotenv';
+
+config({ path: path.resolve(process.cwd(), 'apps/moderation/.env') });
+config();
+
+import { defineConfig } from 'prisma/config';
 
 export default defineConfig({
   schema: 'src/prisma/schema.prisma',
@@ -7,6 +12,6 @@ export default defineConfig({
     path: 'src/prisma/migrations',
   },
   datasource: {
-    url: env('MODERATION_DATABASE_URL'),
+    url: process.env.MODERATION_DATABASE_URL ?? process.env.DATABASE_URL,
   },
 });
