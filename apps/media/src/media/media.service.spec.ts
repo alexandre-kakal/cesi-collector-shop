@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../minio/minio.service';
@@ -14,11 +14,13 @@ describe('MediaService (unit)', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     mediaVariant: { create: jest.fn() },
   };
   const mockMinio = {
     upload: jest.fn(),
+    delete: jest.fn(),
     getPublicUrl: jest.fn((key: string) => `http://minio/${key}`),
   };
   const mockSharp = { generateVariants: jest.fn() };
@@ -157,6 +159,50 @@ describe('MediaService (unit)', () => {
         include: { variants: true },
       });
       expect(result).toEqual({ ...mediaFile, originalUrl: 'http://minio/k', variants: [] });
+    });
+
+    it('should throw NotFoundException when media not found', async () => {
+      mockPrisma.mediaFile.findUnique.mockResolvedValue(null);
+
+      await expect(service.findOne('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('invalid')).rejects.toThrow('Media invalid not found');
+    });
+  });
+
+  describe('checkOwnership', () => {
+    it('should return true when user is owner', async () => {
+      mockPrisma.mediaFile.findUnique.mockResolvedValue({ uploadedBy: 'user-1' });
+
+      const result = await service.checkOwnership('mf-1', 'user-1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when user is not owner', async () => {
+      mockPrisma.mediaFile.findUnique.mockResolvedValue({ uploadedBy: 'other' });
+
+      const result = await service.checkOwnership('mf-1', 'user-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('remove', () => {
+    it('should delete media file and variants from MinIO', async () => {
+      mockPrisma.mediaFile.findUnique.mockResolvedValue({
+        id: 'mf-1',
+        storageKey: 'originals/x.jpg',
+        variants: [{ storageKey: 'variants/mf-1/thumb.webp' }],
+      });
+      mockPrisma.mediaFile.delete.mockResolvedValue({});
+      mockMinio.delete.mockResolvedValue(undefined);
+
+      const result = await service.remove('mf-1');
+
+      expect(mockMinio.delete).toHaveBeenCalledWith('originals/x.jpg');
+      expect(mockMinio.delete).toHaveBeenCalledWith('variants/mf-1/thumb.webp');
+      expect(mockPrisma.mediaFile.delete).toHaveBeenCalledWith({ where: { id: 'mf-1' } });
+      expect(result).toEqual({ message: 'Media deleted successfully' });
     });
   });
 });

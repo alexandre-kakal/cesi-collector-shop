@@ -101,7 +101,7 @@ jobs:
           LISTING_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_listing_test
 
       - name: Generate coverage report
-        run: npm run test:cov -- --testPathPatterns=apps/listing --coverageDirectory=coverage/listing
+        run: npm run test:cov -- --testPathPatterns=apps/listing --coverageDirectory=coverage/listing --collectCoverageFrom='apps/listing/**/*.ts' --collectCoverageFrom='libs/shared/**/*.ts' --collectCoverageFrom='!**/*.spec.ts' --collectCoverageFrom='!**/*.integration-spec.ts' --collectCoverageFrom='!**/seed-runner.ts' --collectCoverageFrom='!**/seed.service.ts' --collectCoverageFrom='!libs/shared/src/strategies/**' --collectCoverageFrom='!libs/shared/src/rabbitmq/rabbitmq.module.ts' --collectCoverageFrom='!**/prisma.service.ts'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

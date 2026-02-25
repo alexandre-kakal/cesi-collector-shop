@@ -10,6 +10,7 @@ NAMESPACE = cesi-shop
 .PHONY: help minikube-start minikube-status build-images minikube-load certs \
 	sops-decrypt k8s-apply k8s-delete k8s-status k8s-local k8s-local-start \
 	argocd-install argocd-apps argocd argocd-password argocd-ui \
+	monitoring-install monitoring-ui monitoring-ingress \
 	k8s-deploy validate
 
 # ─────────────────────────────────────────────
@@ -45,6 +46,11 @@ help:
 	@echo "  argocd            argocd-install + argocd-apps"
 	@echo "  argocd-password   Afficher le mot de passe admin ArgoCD"
 	@echo "  argocd-ui         Lancer port-forward vers l'UI ArgoCD (https://localhost:8080)"
+	@echo ""
+	@echo "Monitoring (Prometheus + Grafana):"
+	@echo "  monitoring-install  Installer kube-prometheus-stack (Prometheus, Grafana, dashboards CPU/RAM/Disk)"
+	@echo "  monitoring-ui       Port-forward Grafana sur http://localhost:3000"
+	@echo "  monitoring-ingress  Configurer l'Ingress Grafana (https://grafana.cesi-shop.local)"
 	@echo ""
 	@echo "Déploiement direct (sans Kustomize):"
 	@echo "  k8s-deploy        kubectl apply base + infrastructure + apps + ingress"
@@ -178,6 +184,35 @@ argocd-password:
 argocd-ui:
 	@echo "🌐 ArgoCD UI: https://localhost:8080 (admin / make argocd-password)"
 	kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# ─────────────────────────────────────────────
+# Monitoring (Prometheus + Grafana)
+# ─────────────────────────────────────────────
+monitoring-install:
+	@echo "📊 Installing kube-prometheus-stack (Prometheus + Grafana + dashboards)..."
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+	kubectl create namespace monitoring 2>/dev/null || true
+	helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+		-n monitoring \
+		--set grafana.adminPassword=admin
+	@echo "✅ Monitoring stack installed. Access Grafana: make monitoring-ui"
+
+monitoring-ui:
+	@echo "🌐 Grafana: http://localhost:3000 (admin / admin)"
+	kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+
+monitoring-ingress: certs
+	@echo "🔗 Configuring Grafana Ingress..."
+	kubectl create namespace monitoring 2>/dev/null || true
+	kubectl create secret tls grafana-cesi-shop-tls -n monitoring \
+		--cert=k8s/certs/cesi-shop.local.crt \
+		--key=k8s/certs/cesi-shop.local.key \
+		--dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f k8s/infrastructure/grafana-ingress.yaml
+	@echo "✅ Grafana Ingress configured."
+	@echo "   Add to /etc/hosts: $$(minikube ip) grafana.cesi-shop.local"
+	@echo "   Grafana: https://grafana.cesi-shop.local (admin / admin)"
 
 # ─────────────────────────────────────────────
 # Déploiement direct (sans Kustomize overlay)

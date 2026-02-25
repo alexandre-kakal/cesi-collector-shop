@@ -1,0 +1,28 @@
+# Ingress pour Grafana (namespace monitoring)
+# Prérequis: make monitoring-install, make certs, make monitoring-ingress
+# Host: grafana.cesi-shop.local (ajouter à /etc/hosts)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - grafana.cesi-shop.local
+      secretName: grafana-cesi-shop-tls
+  rules:
+    - host: grafana.cesi-shop.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80

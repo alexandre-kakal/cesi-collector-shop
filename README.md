@@ -100,6 +100,7 @@ cesi-collector-shop/
 - [Docker](https://www.docker.com/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Minikube](https://minikube.sigs.k8s.io/)
+- [Helm 3](https://helm.sh/) (optionnel, pour le monitoring)
 
 ### CI/CD (GitHub Actions)
 
@@ -224,6 +225,7 @@ kubectl logs -f deployment/auth-service -n cesi-shop
 
 - RabbitMQ: `http://cesi-shop.local/rabbitmq` (guest/guest)
 - MinIO: `http://cesi-shop.local/minio` (minioadmin/minioadmin123)
+- Grafana: `https://grafana.cesi-shop.local` ou `http://localhost:3000` (admin/admin) – après `make monitoring-install`
 
 ### Health Checks
 
@@ -289,10 +291,39 @@ git push
 
 ## 📊 Monitoring (Optionnel)
 
-- Prometheus pour les métriques
-- Grafana pour la visualisation
-- Loki pour les logs
-- Jaeger pour le tracing distribué
+Stack Prometheus + Grafana avec dashboards pré-provisionnés (CPU, RAM, Disk par pod).
+
+### Installation
+
+**Prérequis:** Helm 3 (`brew install helm`)
+
+```bash
+# 1. Installer le stack (Prometheus, Grafana, Node Exporter, kube-state-metrics)
+make monitoring-install
+
+# 2a. Accès rapide via port-forward
+make monitoring-ui
+# Ouvrir http://localhost:3000  |  admin / admin
+
+# 2b. OU via Ingress (après make certs)
+make monitoring-ingress
+# Ajouter à /etc/hosts: $(minikube ip) grafana.cesi-shop.local
+# Grafana: https://grafana.cesi-shop.local  |  admin / admin
+```
+
+> **Note Ingress:** Si les certificats ont été générés avant l’ajout de `grafana.cesi-shop.local`, régénérer avec `rm k8s/certs/cesi-shop.local.* && make certs`.
+
+### Dashboards inclus
+
+- **315 - cAdvisor** : CPU, RAM, filesystem par container
+- **6417 - Node Exporter** : CPU, RAM, disk au niveau du nœud
+- **6418 - Node Exporter Disks** : détails par disque
+- **6419 - kube-state-metrics** : pods, deployments, réplicas
+
+### Composants déployés
+
+- Prometheus, Grafana, kube-state-metrics, Node Exporter (namespace `monitoring`)
+- Les métriques sont collectées automatiquement via cAdvisor (kubelet) – aucune modification des apps requise
 
 ## 🆘 Troubleshooting
 

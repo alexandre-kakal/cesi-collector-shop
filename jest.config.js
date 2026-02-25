@@ -39,4 +39,12 @@ module.exports = {
   testTimeout: 30000,
   verbose: true,
   transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
+  coverageThreshold: {
+    global: {
+      statements: 60,
+      branches: 50,
+      functions: 40,
+      lines: 60,
+    },
+  },
 };

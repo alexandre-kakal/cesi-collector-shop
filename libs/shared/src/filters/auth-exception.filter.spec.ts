@@ -50,4 +50,39 @@ describe('AuthExceptionFilter', () => {
       }),
     );
   });
+
+  it('should handle exception with string getResponse', () => {
+    const exception = Object.create(UnauthorizedException.prototype);
+    exception.getStatus = () => 401;
+    exception.getResponse = () => 'Direct string message';
+    exception.message = 'fallback';
+    exception.name = 'UnauthorizedException';
+
+    filter.catch(exception as any, createMockHost());
+
+    expect(mockResponse.status).toHaveBeenCalledWith(401);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 401,
+        message: 'Direct string message',
+        error: 'UnauthorizedException',
+      }),
+    );
+  });
+
+  it('should use exception.message when response object has no message', () => {
+    const exception = Object.create(ForbiddenException.prototype);
+    exception.getStatus = () => 403;
+    exception.getResponse = () => ({ statusCode: 403 });
+    exception.message = 'Forbidden by default';
+    exception.name = 'ForbiddenException';
+
+    filter.catch(exception as any, createMockHost());
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Forbidden by default',
+      }),
+    );
+  });
 });
