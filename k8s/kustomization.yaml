@@ -34,6 +34,16 @@ patches:
   - path: local/resources-patch.yaml
   - path: local/image-pull-policy-patch.yaml
 
+# Secret TLS pour HTTPS (nécessite make certs avant k8s-apply)
+secretGenerator:
+  - name: cesi-shop-tls
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=certs/cesi-shop.local.crt
+      - tls.key=certs/cesi-shop.local.key
+    options:
+      disableNameSuffixHash: true
+
 # Configuration pour le local
 configMapGenerator:
   - name: local-config

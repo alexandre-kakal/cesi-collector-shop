@@ -1,3 +1,7 @@
+# Certificats SSL locaux (générés par make certs)
+certs/*.crt
+certs/*.key
+
 # Secrets - Ne jamais committer!
 secrets.prod.yaml
 *-secrets.yaml

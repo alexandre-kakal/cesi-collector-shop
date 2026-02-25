@@ -7,7 +7,7 @@ REGISTRY ?= localhost:32770
 TAG ?= dev
 NAMESPACE = cesi-shop
 
-.PHONY: help minikube-start minikube-status build-images minikube-load \
+.PHONY: help minikube-start minikube-status build-images minikube-load certs \
 	sops-decrypt k8s-apply k8s-delete k8s-status k8s-local k8s-local-start \
 	argocd-install argocd-apps argocd argocd-password argocd-ui \
 	k8s-deploy validate
@@ -21,6 +21,9 @@ help:
 	@echo "Cluster:"
 	@echo "  minikube-start     Démarrer Minikube (cpus=4, mem=8G, ingress, registry)"
 	@echo "  minikube-status   Vérifier le statut Minikube"
+	@echo ""
+	@echo "SSL local:"
+	@echo "  certs            Générer le certificat SSL pour cesi-shop.local"
 	@echo ""
 	@echo "Images:"
 	@echo "  build-images      Construire les images Docker (REGISTRY=$(REGISTRY) TAG=$(TAG))"
@@ -76,9 +79,9 @@ build-images:
 	@echo "✅ Backend images built."
 
 build-frontend:
-	@echo "🔨 Building frontend (VITE_API_URL=http://cesi-shop.local)..."
+	@echo "🔨 Building frontend (API relative = même origine, pas de CORS)..."
 	docker build -f ../cesi-collector-shop-front/Dockerfile \
-		--build-arg VITE_API_URL=http://cesi-shop.local \
+		--build-arg VITE_API_URL= \
 		-t cesi-shop-frontend:$(TAG) ../cesi-collector-shop-front/
 	@echo "✅ Frontend image built."
 
@@ -104,9 +107,18 @@ sops-decrypt:
 	@echo "✅ k8s/base/secrets.yaml created (gitignored)."
 
 # ─────────────────────────────────────────────
+# Certificat SSL local
+# ─────────────────────────────────────────────
+certs:
+	@echo "🔐 Generating SSL certificate for cesi-shop.local..."
+	@chmod +x k8s/certs/generate.sh
+	./k8s/certs/generate.sh
+	@echo "✅ Run: make k8s-apply"
+
+# ─────────────────────────────────────────────
 # Déploiement Kustomize (k8s/)
 # ─────────────────────────────────────────────
-k8s-apply:
+k8s-apply: certs
 	@if [ -f k8s/base/secrets.enc.yaml ]; then $(MAKE) sops-decrypt; fi
 	@echo "🚀 Deploying to cluster (kustomize k8s/)..."
 	kubectl apply -k k8s/
@@ -123,18 +135,22 @@ k8s-status:
 	@echo "Services:"
 	kubectl get svc -n $(NAMESPACE)
 
-k8s-local: minikube-start minikube-load
+k8s-local: minikube-start certs minikube-load
 	@echo "🚀 Deploying to Minikube..."
 	kubectl apply -k k8s/
-	@echo "✅ Local setup complete. make k8s-status  |  Add to /etc/hosts: $$(minikube ip) cesi-shop.local"
+	@echo "✅ Local setup complete. make k8s-status"
+	@echo "   Add to /etc/hosts: $$(minikube ip) cesi-shop.local"
+	@echo "   App: https://cesi-shop.local"
 
 k8s-local-start:
 	@echo "▶ Starting Minikube (if needed)..."
 	@minikube status >/dev/null 2>&1 || $(MAKE) minikube-start
+	@$(MAKE) certs
 	@if [ -f k8s/base/secrets.enc.yaml ]; then $(MAKE) sops-decrypt; fi
 	@echo "🚀 Applying manifests..."
 	kubectl apply -k k8s/
-	@echo "✅ Local setup started. make k8s-status  |  Add to /etc/hosts: $$(minikube ip) cesi-shop.local"
+	@echo "✅ Local setup started. make k8s-status"
+	@echo "   Add to /etc/hosts: $$(minikube ip) cesi-shop.local  |  App: https://cesi-shop.local"
 
 # ─────────────────────────────────────────────
 # ArgoCD

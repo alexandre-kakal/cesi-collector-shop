@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { NotFoundException } from '@nestjs/common';
 
 describe('AuthController (unit)', () => {
   let controller: AuthController;
@@ -10,6 +11,7 @@ describe('AuthController (unit)', () => {
     register: jest.fn(),
     refreshTokens: jest.fn(),
     revokeToken: jest.fn(),
+    getUserById: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -69,6 +71,57 @@ describe('AuthController (unit)', () => {
       await expect(controller.register('u@test.com', 'pass', '', undefined)).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe('refresh', () => {
+    it('should call authService.refreshTokens and return tokens', async () => {
+      const tokens = { accessToken: 'at', refreshToken: 'rt' };
+      mockAuthService.refreshTokens.mockResolvedValue(tokens);
+
+      const out = await controller.refresh('refresh-token');
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('refresh-token');
+      expect(out).toEqual({ tokens });
+    });
+  });
+
+  describe('logout', () => {
+    it('should call authService.revokeToken and return message', async () => {
+      mockAuthService.revokeToken.mockResolvedValue(undefined);
+
+      const out = await controller.logout('refresh-token');
+      expect(mockAuthService.revokeToken).toHaveBeenCalledWith('refresh-token');
+      expect(out).toEqual({ message: 'Logged out successfully' });
+    });
+  });
+
+  describe('me', () => {
+    it('should return user when authenticated', async () => {
+      const user = { id: '1', email: 'u@test.com', role: 'BUYER' };
+      const out = await controller.me(user as any);
+      expect(out).toEqual({ user });
+    });
+
+    it('should throw when user is null', async () => {
+      await expect(controller.me(null as any)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('getUser', () => {
+    it('should return user by id', async () => {
+      const user = { id: '1', name: 'Test', email: 'u@test.com', role: 'ADMIN' };
+      mockAuthService.getUserById.mockResolvedValue(user);
+
+      const out = await controller.getUser('1');
+      expect(mockAuthService.getUserById).toHaveBeenCalledWith('1');
+      expect(out).toEqual({ user });
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      mockAuthService.getUserById.mockResolvedValue(null);
+
+      await expect(controller.getUser('invalid')).rejects.toThrow(NotFoundException);
+      await expect(controller.getUser('invalid')).rejects.toThrow('User invalid not found');
     });
   });
 });

@@ -1,5 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as argon2 from 'argon2';
+
+jest.mock('argon2', () => ({
+  verify: jest.fn().mockResolvedValue(true),
+  hash: jest.fn().mockResolvedValue('hashed'),
+}));
 import { AuthService } from './auth.service';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -150,6 +157,104 @@ describe('AuthService (unit)', () => {
       });
 
       await expect(service.revokeToken('invalid-token')).resolves.not.toThrow();
+    });
+  });
+
+  describe('login', () => {
+    it('should return user and tokens when credentials valid', async () => {
+      const user = { id: 'u1', email: 'u@test.com', name: 'Test', role: 'SELLER' };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+      mockPrisma.account.findFirst.mockResolvedValue({ password: 'hashed' });
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login('u@test.com', 'pass');
+
+      expect(result.user).toEqual({ id: 'u1', email: 'u@test.com', name: 'Test', role: 'SELLER' });
+      expect(result.tokens).toBeDefined();
+    });
+
+    it('should throw when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.login('unknown@test.com', 'pass')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.login('unknown@test.com', 'pass')).rejects.toThrow(
+        'Invalid credentials',
+      );
+    });
+
+    it('should throw when account has no password', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        email: 'u@test.com',
+        name: 'T',
+        role: 'BUYER',
+      });
+      mockPrisma.account.findFirst.mockResolvedValue(null);
+
+      await expect(service.login('u@test.com', 'pass')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw when password invalid', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        email: 'u@test.com',
+        name: 'T',
+        role: 'BUYER',
+      });
+      mockPrisma.account.findFirst.mockResolvedValue({ password: 'hash' });
+      (argon2.verify as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login('u@test.com', 'wrong')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('register', () => {
+    it('should create user and account and return tokens', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({});
+      mockPrisma.account.create.mockResolvedValue({});
+
+      const result = await service.register('new@test.com', 'pass', 'New User', Role.BUYER);
+
+      expect(result.user).toEqual({
+        id: expect.any(String),
+        email: 'new@test.com',
+        name: 'New User',
+        role: Role.BUYER,
+      });
+      expect(result.tokens).toBeDefined();
+      expect(mockPrisma.user.create).toHaveBeenCalled();
+      expect(mockPrisma.account.create).toHaveBeenCalled();
+    });
+
+    it('should throw when email already registered', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'e', email: 'exist@test.com' });
+
+      await expect(service.register('exist@test.com', 'pass', 'X', Role.BUYER)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.register('exist@test.com', 'pass', 'X', Role.BUYER)).rejects.toThrow(
+        'Email already registered',
+      );
+    });
+  });
+
+  describe('getUserById', () => {
+    it('should return user when found', async () => {
+      const user = { id: 'u1', name: 'Test', email: 'u@test.com', role: 'ADMIN' };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+
+      const result = await service.getUserById('u1');
+      expect(result).toEqual(user);
+    });
+
+    it('should return null when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.getUserById('invalid');
+      expect(result).toBeNull();
     });
   });
 });

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import { ListingService } from './listing.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,10 +25,12 @@ describe('ListingService (unit)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    const mockConfig = { get: jest.fn((key: string, defaultVal?: string) => defaultVal ?? '') };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ListingService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: ConfigService, useValue: mockConfig },
         { provide: RABBITMQ_CLIENT_TOKEN, useValue: mockRmq },
       ],
     }).compile();

@@ -20,7 +20,7 @@ spec:
       containers:
         - name: frontend
           image: cesi-shop-frontend:dev
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 80
               name: http

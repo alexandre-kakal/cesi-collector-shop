@@ -17,7 +17,10 @@ describe('MediaService (unit)', () => {
     },
     mediaVariant: { create: jest.fn() },
   };
-  const mockMinio = { upload: jest.fn(), getPublicUrl: jest.fn((key: string) => `http://minio/${key}`) };
+  const mockMinio = {
+    upload: jest.fn(),
+    getPublicUrl: jest.fn((key: string) => `http://minio/${key}`),
+  };
   const mockSharp = { generateVariants: jest.fn() };
   const mockRmq = { emit: jest.fn() };
 
@@ -42,15 +45,31 @@ describe('MediaService (unit)', () => {
 
   describe('upload', () => {
     it('should reject non-image mime types', async () => {
-      const file = { mimetype: 'application/pdf', originalname: 'a.pdf', size: 100, buffer: Buffer.from('') } as Express.Multer.File;
+      const file = {
+        mimetype: 'application/pdf',
+        originalname: 'a.pdf',
+        size: 100,
+        buffer: Buffer.from(''),
+      } as Express.Multer.File;
 
       await expect(service.upload(file, 'user-1')).rejects.toThrow(BadRequestException);
-      await expect(service.upload(file, 'user-1')).rejects.toThrow('Only JPEG, PNG, and WebP images are allowed');
+      await expect(service.upload(file, 'user-1')).rejects.toThrow(
+        'Only JPEG, PNG, and WebP images are allowed',
+      );
     });
 
     it('should create mediaFile and upload when mime is allowed', async () => {
-      const file = { mimetype: 'image/jpeg', originalname: 'photo.jpg', size: 100, buffer: Buffer.from('') } as Express.Multer.File;
-      const mediaFile = { id: 'mf-1', storageKey: 'originals/uuid-photo.jpg', status: 'PROCESSING' };
+      const file = {
+        mimetype: 'image/jpeg',
+        originalname: 'photo.jpg',
+        size: 100,
+        buffer: Buffer.from(''),
+      } as Express.Multer.File;
+      const mediaFile = {
+        id: 'mf-1',
+        storageKey: 'originals/uuid-photo.jpg',
+        status: 'PROCESSING',
+      };
       mockPrisma.mediaFile.create.mockResolvedValue(mediaFile);
       mockPrisma.mediaFile.update.mockResolvedValue({ ...mediaFile, status: 'READY' });
       mockMinio.upload.mockResolvedValue(undefined);
@@ -64,7 +83,12 @@ describe('MediaService (unit)', () => {
     });
 
     it('should create variants, upload to minio, update READY and emit event', async () => {
-      const file = { mimetype: 'image/png', originalname: 'img.png', size: 200, buffer: Buffer.from('png') } as Express.Multer.File;
+      const file = {
+        mimetype: 'image/png',
+        originalname: 'img.png',
+        size: 200,
+        buffer: Buffer.from('png'),
+      } as Express.Multer.File;
       const mediaFile = { id: 'mf-2', storageKey: 'originals/abc-img.png', status: 'PROCESSING' };
       const variants = [
         { type: 'THUMB', buffer: Buffer.from(''), width: 100, height: 100, size: 500 },
@@ -99,7 +123,12 @@ describe('MediaService (unit)', () => {
     });
 
     it('should set status FAILED and rethrow when processing fails', async () => {
-      const file = { mimetype: 'image/jpeg', originalname: 'x.jpg', size: 100, buffer: Buffer.from('') } as Express.Multer.File;
+      const file = {
+        mimetype: 'image/jpeg',
+        originalname: 'x.jpg',
+        size: 100,
+        buffer: Buffer.from(''),
+      } as Express.Multer.File;
       const mediaFile = { id: 'mf-3', storageKey: 'originals/x.jpg', status: 'PROCESSING' };
       mockPrisma.mediaFile.create.mockResolvedValue(mediaFile);
       mockMinio.upload.mockResolvedValue(undefined);
@@ -127,7 +156,7 @@ describe('MediaService (unit)', () => {
         where: { id: 'mf-1' },
         include: { variants: true },
       });
-      expect(result).toEqual(mediaFile);
+      expect(result).toEqual({ ...mediaFile, originalUrl: 'http://minio/k', variants: [] });
     });
   });
 });
