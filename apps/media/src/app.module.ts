@@ -7,10 +7,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MinioModule } from './minio/minio.module';
 import { ProcessingModule } from './processing/processing.module';
 import { MediaModule } from './media/media.module';
-import { JwtStrategy, JwtAuthGuard, HealthController } from '@app/shared';
+import { JwtStrategy, JwtAuthGuard, HealthController, PrometheusModule } from '@app/shared';
 
 @Module({
   imports: [
+    PrometheusModule.forRoot({ serviceName: 'media' }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: 'apps/media/.env',

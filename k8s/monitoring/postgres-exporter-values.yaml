@@ -1,0 +1,13 @@
+# Values pour prometheus-postgres-exporter (DB auth)
+# Utilise le secret postgres-exporter-auth créé par make monitoring-postgres
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+  interval: 30s
+
+config:
+  datasourceSecret:
+    name: postgres-exporter-auth
+    key: DATA_SOURCE_NAME
