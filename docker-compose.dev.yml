@@ -1,0 +1,341 @@
+networks:
+  collector-net:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-listing-data:
+  postgres-moderation-data:
+  postgres-media-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+  node_modules_auth:
+  node_modules_listing:
+  node_modules_moderation:
+  node_modules_media:
+  node_modules_frontend:
+
+services:
+  # ============================================================
+  # PostgreSQL Databases (Same as production)
+  # ============================================================
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: collector-postgres-auth-dev
+    environment:
+      POSTGRES_USER: cesishop
+      POSTGRES_PASSWORD: cesishoppassword
+      POSTGRES_DB: auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesishop -d auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-listing:
+    image: postgres:16-alpine
+    container_name: collector-postgres-listing-dev
+    environment:
+      POSTGRES_USER: cesishop
+      POSTGRES_PASSWORD: cesishoppassword
+      POSTGRES_DB: listing
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-listing-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesishop -d listing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-moderation:
+    image: postgres:16-alpine
+    container_name: collector-postgres-moderation-dev
+    environment:
+      POSTGRES_USER: cesishop
+      POSTGRES_PASSWORD: cesishoppassword
+      POSTGRES_DB: moderation
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-moderation-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesishop -d moderation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-media:
+    image: postgres:16-alpine
+    container_name: collector-postgres-media-dev
+    environment:
+      POSTGRES_USER: cesishop
+      POSTGRES_PASSWORD: cesishoppassword
+      POSTGRES_DB: media
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-media-data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesishop -d media"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # Redis
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: collector-redis-dev
+    command: redis-server --requirepass cesishoppassword --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "cesishoppassword", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ============================================================
+  # RabbitMQ
+  # ============================================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: collector-rabbitmq-dev
+    environment:
+      RABBITMQ_DEFAULT_USER: cesishop
+      RABBITMQ_DEFAULT_PASS: cesishoppassword
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ============================================================
+  # MinIO
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    container_name: collector-minio-dev
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: cesishop
+      MINIO_ROOT_PASSWORD: cesishoppassword
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # Auth Service (DEV mode with hot reload)
+  # ============================================================
+  auth:
+    image: node:20-alpine
+    container_name: collector-auth-dev
+    working_dir: /app
+    command: sh -c "npm install && npx prisma generate --config apps/auth/prisma.config.ts && npm run start:auth:dev"
+    volumes:
+      - .:/app
+      - node_modules_auth:/app/node_modules
+      - /app/dist
+    environment:
+      NODE_ENV: development
+      AUTH_DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-auth:5432/auth
+      DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-auth:5432/auth
+      JWT_SECRET: cesi-collector-shop-jwt-secret-change-in-production
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: cesishoppassword
+      RABBITMQ_URL: amqp://cesishop:cesishoppassword@rabbitmq:5672
+      PORT: 3010
+    ports:
+      - "3010:3010"
+    networks:
+      - collector-net
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ============================================================
+  # Listing Service (DEV mode with hot reload)
+  # ============================================================
+  listing:
+    image: node:20-alpine
+    container_name: collector-listing-dev
+    working_dir: /app
+    command: sh -c "npm install && npx prisma generate --config apps/listing/prisma.config.ts && npm run start:listing:dev"
+    volumes:
+      - .:/app
+      - node_modules_listing:/app/node_modules
+      - /app/dist
+    environment:
+      NODE_ENV: development
+      LISTING_DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-listing:5432/listing
+      DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-listing:5432/listing
+      RABBITMQ_URL: amqp://cesishop:cesishoppassword@rabbitmq:5672
+      JWT_SECRET: cesi-collector-shop-jwt-secret-change-in-production
+      MEDIA_SERVICE_URL: http://media:3050
+      PORT: 3020
+    ports:
+      - "3020:3020"
+    networks:
+      - collector-net
+    depends_on:
+      postgres-listing:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      media:
+        condition: service_started
+
+  # ============================================================
+  # Moderation Service (DEV mode with hot reload)
+  # ============================================================
+  moderation:
+    image: node:20-alpine
+    container_name: collector-moderation-dev
+    working_dir: /app
+    command: sh -c "npm install && npx prisma generate --config apps/moderation/prisma.config.ts && npm run start:moderation:dev"
+    volumes:
+      - .:/app
+      - node_modules_moderation:/app/node_modules
+      - /app/dist
+    environment:
+      NODE_ENV: development
+      MODERATION_DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-moderation:5432/moderation
+      DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-moderation:5432/moderation
+      RABBITMQ_URL: amqp://cesishop:cesishoppassword@rabbitmq:5672
+      JWT_SECRET: cesi-collector-shop-jwt-secret-change-in-production
+      PORT: 3030
+    ports:
+      - "3030:3030"
+    networks:
+      - collector-net
+    depends_on:
+      postgres-moderation:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ============================================================
+  # Media Service (DEV mode with hot reload)
+  # ============================================================
+  media:
+    image: node:20-alpine
+    container_name: collector-media-dev
+    working_dir: /app
+    command: sh -c "apk add --no-cache vips-dev python3 make g++ && npm install -g cross-env node-gyp && npm install --ignore-scripts && chmod -R +x node_modules && npm rebuild && npx prisma generate --config apps/media/prisma.config.ts && npm run start:media:dev"
+    volumes:
+      - .:/app
+      - node_modules_media:/app/node_modules
+      - /app/dist
+    environment:
+      NODE_ENV: development
+      MEDIA_DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-media:5432/media
+      DATABASE_URL: postgresql://cesishop:cesishoppassword@postgres-media:5432/media
+      RABBITMQ_URL: amqp://cesishop:cesishoppassword@rabbitmq:5672
+      JWT_SECRET: cesi-collector-shop-jwt-secret-change-in-production
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: cesishop
+      MINIO_SECRET_KEY: cesishoppassword
+      MINIO_USE_SSL: false
+      MINIO_BUCKET_NAME: collector-shop
+      MINIO_PUBLIC_BASE_URL: http://localhost:8080/api/v1/media/files
+      PORT: 3050
+    ports:
+      - "3050:3050"
+    networks:
+      - collector-net
+    depends_on:
+      postgres-media:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ============================================================
+  # Frontend (DEV mode with Vite hot reload)
+  # ============================================================
+  frontend:
+    image: node:20-alpine
+    container_name: collector-frontend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ../cesi-collector-shop-front:/app
+      - node_modules_frontend:/app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - "5173:5173"
+    networks:
+      - collector-net
+
+  # ============================================================
+  # Nginx API Gateway
+  # ============================================================
+  nginx:
+    image: nginx:1.26-alpine
+    container_name: collector-nginx-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - collector-net
+    depends_on:
+      - frontend
+      - auth
+      - listing
+      - moderation
+      - media
+      - minio
+    restart: unless-stopped

@@ -63,7 +63,7 @@ spec:
             command:
             - pg_isready
             - -U
-            - cesishop
+            - cesishop_dev
             - -d
             - auth
           initialDelaySeconds: 30
@@ -73,7 +73,7 @@ spec:
             command:
             - pg_isready
             - -U
-            - cesishop
+            - cesishop_dev
             - -d
             - auth
           initialDelaySeconds: 5

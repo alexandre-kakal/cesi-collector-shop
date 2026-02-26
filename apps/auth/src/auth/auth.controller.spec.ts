@@ -1,24 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-
-const mockHandler = jest.fn();
-
-jest.mock('better-auth/node', () => ({
-  toNodeHandler: () => mockHandler,
-}));
-
-jest.mock('./better-auth.config', () => ({
-  auth: {},
-}));
+import { NotFoundException } from '@nestjs/common';
 
 describe('AuthController (unit)', () => {
   let controller: AuthController;
-  const mockAuthService = { publishUserRegistered: jest.fn() };
+  const mockAuthService = {
+    login: jest.fn(),
+    register: jest.fn(),
+    refreshTokens: jest.fn(),
+    revokeToken: jest.fn(),
+    getUserById: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockHandler.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -32,25 +29,99 @@ describe('AuthController (unit)', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('handleBetterAuth', () => {
-    it('should delegate to better-auth handler with req and res', async () => {
-      const req = { url: '/api/auth/sign-in', method: 'POST' } as any;
-      const res = { end: jest.fn() } as any;
+  describe('login', () => {
+    it('should call authService.login with email and password', async () => {
+      const result = {
+        user: { id: '1', email: 'u@test.com', name: 'Test', role: 'BUYER' },
+        tokens: { accessToken: 'a', refreshToken: 'r' },
+      };
+      mockAuthService.login.mockResolvedValue(result);
 
-      await controller.handleBetterAuth(req, res);
+      const out = await controller.login('u@test.com', 'pass');
+      expect(mockAuthService.login).toHaveBeenCalledWith('u@test.com', 'pass');
+      expect(out).toEqual(result);
+    });
 
-      expect(mockHandler).toHaveBeenCalledWith(req, res);
+    it('should throw when email or password missing', async () => {
+      await expect(controller.login('', 'pass')).rejects.toThrow(UnauthorizedException);
+      await expect(controller.login('u@test.com', '')).rejects.toThrow(UnauthorizedException);
     });
   });
 
-  describe('getSession', () => {
-    it('should delegate to better-auth handler', async () => {
-      const req = { url: '/api/auth/get-session', method: 'GET' } as any;
-      const res = {} as any;
+  describe('register', () => {
+    it('should call authService.register with correct params', async () => {
+      const result = {
+        user: { id: '1', email: 'u@test.com', name: 'Test', role: 'BUYER' },
+        tokens: { accessToken: 'a', refreshToken: 'r' },
+      };
+      mockAuthService.register.mockResolvedValue(result);
 
-      await controller.getSession(req, res);
+      const out = await controller.register('u@test.com', 'pass', 'Test', undefined);
+      expect(mockAuthService.register).toHaveBeenCalledWith('u@test.com', 'pass', 'Test', 'BUYER');
+      expect(out).toEqual(result);
+    });
 
-      expect(mockHandler).toHaveBeenCalledWith(req, res);
+    it('should throw when required fields missing', async () => {
+      await expect(controller.register('', 'pass', 'Test', undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(controller.register('u@test.com', '', 'Test', undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(controller.register('u@test.com', 'pass', '', undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+  });
+
+  describe('refresh', () => {
+    it('should call authService.refreshTokens and return tokens', async () => {
+      const tokens = { accessToken: 'at', refreshToken: 'rt' };
+      mockAuthService.refreshTokens.mockResolvedValue(tokens);
+
+      const out = await controller.refresh('refresh-token');
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith('refresh-token');
+      expect(out).toEqual({ tokens });
+    });
+  });
+
+  describe('logout', () => {
+    it('should call authService.revokeToken and return message', async () => {
+      mockAuthService.revokeToken.mockResolvedValue(undefined);
+
+      const out = await controller.logout('refresh-token');
+      expect(mockAuthService.revokeToken).toHaveBeenCalledWith('refresh-token');
+      expect(out).toEqual({ message: 'Logged out successfully' });
+    });
+  });
+
+  describe('me', () => {
+    it('should return user when authenticated', async () => {
+      const user = { id: '1', email: 'u@test.com', role: 'BUYER' };
+      const out = await controller.me(user as any);
+      expect(out).toEqual({ user });
+    });
+
+    it('should throw when user is null', async () => {
+      await expect(controller.me(null as any)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('getUser', () => {
+    it('should return user by id', async () => {
+      const user = { id: '1', name: 'Test', email: 'u@test.com', role: 'ADMIN' };
+      mockAuthService.getUserById.mockResolvedValue(user);
+
+      const out = await controller.getUser('1');
+      expect(mockAuthService.getUserById).toHaveBeenCalledWith('1');
+      expect(out).toEqual({ user });
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      mockAuthService.getUserById.mockResolvedValue(null);
+
+      await expect(controller.getUser('invalid')).rejects.toThrow(NotFoundException);
+      await expect(controller.getUser('invalid')).rejects.toThrow('User invalid not found');
     });
   });
 });

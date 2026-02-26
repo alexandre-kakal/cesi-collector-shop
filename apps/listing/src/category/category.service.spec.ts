@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -14,16 +14,15 @@ describe('CategoryService (unit)', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
+    listing: { count: jest.fn() },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CategoryService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [CategoryService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<CategoryService>(CategoryService);
@@ -44,7 +43,11 @@ describe('CategoryService (unit)', () => {
 
       expect(prisma.category.create).toHaveBeenCalledWith({
         data: dto,
-        include: { parent: true, children: true },
+        include: {
+          parent: true,
+          children: true,
+          _count: { select: { listings: true } },
+        },
       });
       expect(result).toEqual(created);
     });
@@ -52,13 +55,19 @@ describe('CategoryService (unit)', () => {
 
   describe('findAll', () => {
     it('should return an array of categories', async () => {
-      const categories = [{ id: '1', name: 'A', description: null, parentId: null, parent: null, children: [] }];
+      const categories = [
+        { id: '1', name: 'A', description: null, parentId: null, parent: null, children: [] },
+      ];
       mockPrisma.category.findMany.mockResolvedValue(categories);
 
       const result = await service.findAll();
 
       expect(prisma.category.findMany).toHaveBeenCalledWith({
-        include: { parent: true, children: true },
+        include: {
+          parent: true,
+          children: true,
+          _count: { select: { listings: true } },
+        },
         orderBy: { name: 'asc' },
       });
       expect(result).toEqual(categories);
@@ -67,14 +76,27 @@ describe('CategoryService (unit)', () => {
 
   describe('findOne', () => {
     it('should return a category by id', async () => {
-      const category = { id: '1', name: 'A', description: null, parentId: null, parent: null, children: [], listings: [] };
+      const category = {
+        id: '1',
+        name: 'A',
+        description: null,
+        parentId: null,
+        parent: null,
+        children: [],
+        listings: [],
+      };
       mockPrisma.category.findUnique.mockResolvedValue(category);
 
       const result = await service.findOne('1');
 
       expect(prisma.category.findUnique).toHaveBeenCalledWith({
         where: { id: '1' },
-        include: { parent: true, children: true, listings: { take: 10 } },
+        include: {
+          parent: true,
+          children: true,
+          listings: { take: 10 },
+          _count: { select: { listings: true } },
+        },
       });
       expect(result).toEqual(category);
     });
@@ -90,7 +112,14 @@ describe('CategoryService (unit)', () => {
   describe('update', () => {
     it('should update a category', async () => {
       const dto = { name: 'Updated' };
-      const updated = { id: '1', name: 'Updated', description: null, parentId: null, parent: null, children: [] };
+      const updated = {
+        id: '1',
+        name: 'Updated',
+        description: null,
+        parentId: null,
+        parent: null,
+        children: [],
+      };
       mockPrisma.category.findUnique.mockResolvedValue({ id: '1' });
       mockPrisma.category.update.mockResolvedValue(updated);
 
@@ -99,22 +128,72 @@ describe('CategoryService (unit)', () => {
       expect(prisma.category.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: dto,
-        include: { parent: true, children: true },
+        include: {
+          parent: true,
+          children: true,
+          _count: { select: { listings: true } },
+        },
       });
       expect(result).toEqual(updated);
     });
   });
 
   describe('remove', () => {
-    it('should delete a category', async () => {
-      const deleted = { id: '1', name: 'A', description: null, parentId: null };
-      mockPrisma.category.findUnique.mockResolvedValue({ id: '1' });
-      mockPrisma.category.delete.mockResolvedValue(deleted);
+    it('should delete a category when no listings or children', async () => {
+      const category = {
+        id: '1',
+        name: 'A',
+        description: null,
+        parentId: null,
+        parent: null,
+        children: [],
+        listings: [],
+      };
+      mockPrisma.category.findUnique.mockResolvedValue(category);
+      mockPrisma.listing.count.mockResolvedValue(0);
+      mockPrisma.category.count.mockResolvedValue(0);
+      mockPrisma.category.delete.mockResolvedValue(category);
 
       const result = await service.remove('1');
 
       expect(prisma.category.delete).toHaveBeenCalledWith({ where: { id: '1' } });
-      expect(result).toEqual(deleted);
+      expect(result).toEqual(category);
+    });
+
+    it('should throw ConflictException when category has listings', async () => {
+      const category = {
+        id: '1',
+        name: 'A',
+        description: null,
+        parentId: null,
+        parent: null,
+        children: [],
+        listings: [],
+      };
+      mockPrisma.category.findUnique.mockResolvedValue(category);
+      mockPrisma.listing.count.mockResolvedValue(2);
+      mockPrisma.category.count.mockResolvedValue(0);
+
+      await expect(service.remove('1')).rejects.toThrow(ConflictException);
+      expect(prisma.category.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when category has children', async () => {
+      const category = {
+        id: '1',
+        name: 'A',
+        description: null,
+        parentId: null,
+        parent: null,
+        children: [],
+        listings: [],
+      };
+      mockPrisma.category.findUnique.mockResolvedValue(category);
+      mockPrisma.listing.count.mockResolvedValue(0);
+      mockPrisma.category.count.mockResolvedValue(1);
+
+      await expect(service.remove('1')).rejects.toThrow(ConflictException);
+      expect(prisma.category.delete).not.toHaveBeenCalled();
     });
   });
 });

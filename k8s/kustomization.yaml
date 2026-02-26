@@ -1,5 +1,4 @@
-# Kustomization racine k8s/ — build local (tous les chemins sous k8s/, compatible Kustomize 5)
-# Usage: kubectl apply -k k8s
+# Kustomization racine pour environnement local
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -8,8 +7,7 @@ namespace: cesi-shop
 resources:
   - base/namespace.yaml
   - base/configmap.yaml
-  - base/secrets.yaml
-  - base/ingress.yaml
+  - base/secrets-local.yaml
   - infrastructure/postgresql-auth.yaml
   - infrastructure/postgresql-listing.yaml
   - infrastructure/postgresql-media.yaml
@@ -17,16 +15,36 @@ resources:
   - infrastructure/rabbitmq.yaml
   - infrastructure/redis.yaml
   - infrastructure/minio.yaml
+  - apps/frontend.yaml
   - apps/auth.yaml
   - apps/listing.yaml
   - apps/media.yaml
   - apps/moderation.yaml
+  - base/ingress.yaml
+  - base/ingress-minio.yaml
+  # - jobs/migrate-all.yaml
+  - jobs/seed-auth-job.yaml
+  - jobs/seed-listing-job.yaml
+  - jobs/seed-media-job.yaml
+  - jobs/seed-moderation-job.yaml
 
+# Patches pour l'environnement local
 patches:
   - path: local/replicas-patch.yaml
   - path: local/resources-patch.yaml
   - path: local/image-pull-policy-patch.yaml
 
+# Secret TLS pour HTTPS (nécessite make certs avant k8s-apply)
+secretGenerator:
+  - name: cesi-shop-tls
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=certs/cesi-shop.local.crt
+      - tls.key=certs/cesi-shop.local.key
+    options:
+      disableNameSuffixHash: true
+
+# Configuration pour le local
 configMapGenerator:
   - name: local-config
     namespace: cesi-shop
@@ -34,19 +52,20 @@ configMapGenerator:
       - ENV=local
       - DEBUG=true
 
-# Local : registry localhost:32770 + tag "dev" (évite :latest → imagePullPolicy: IfNotPresent par défaut).
-# Faire build + load avec le même tag : make build-images && make minikube-load (TAG=dev par défaut).
-# En prod : la CI met à jour k8s/apps/*.yaml avec le tag de version (ex. sha-abc123) → ArgoCD déploie ce tag.
+# Images (Minikube local)
 images:
+  - name: cesi-shop-frontend
+    newName: cesi-shop-frontend
+    newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-auth
-    newName: localhost:32770/cesi-shop-auth
+    newName: cesi-shop-auth
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-listing
-    newName: localhost:32770/cesi-shop-listing
+    newName: cesi-shop-listing
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-media
-    newName: localhost:32770/cesi-shop-media
+    newName: cesi-shop-media
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-moderation
-    newName: localhost:32770/cesi-shop-moderation
+    newName: cesi-shop-moderation
     newTag: dev

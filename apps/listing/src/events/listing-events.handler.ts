@@ -35,9 +35,22 @@ export class ListingEventsHandler {
 
   @EventPattern(RABBITMQ_ROUTING_KEYS.MEDIA_UPLOADED)
   async handleMediaUploaded(@Payload() event: MediaUploadedEvent) {
-    this.logger.log(`Received media.uploaded for mediaId: ${event.mediaId}`);
+    this.logger.log(
+      `Received media.uploaded for mediaId: ${event.mediaId}, listingId: ${event.listingId ?? 'none'}`,
+    );
     if (event.listingId) {
-      await this.listingService.addPhoto(event.listingId, event.mediaId, 0);
+      try {
+        const order = await this.listingService.getNextPhotoOrder(event.listingId);
+        await this.listingService.addPhoto(event.listingId, event.mediaId, order);
+        this.logger.log(`ListingPhoto created: listing ${event.listingId}, media ${event.mediaId}`);
+      } catch (err) {
+        this.logger.error(
+          `Failed to add photo to listing ${event.listingId}: ${err instanceof Error ? err.message : err}`,
+        );
+        throw err;
+      }
+    } else {
+      this.logger.debug('media.uploaded sans listingId — pas de ListingPhoto créé');
     }
   }
 }

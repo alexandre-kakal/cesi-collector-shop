@@ -19,10 +19,8 @@ import { JwtStrategy, JwtAuthGuard, HealthController } from '@app/shared';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        publicKey: configService
-          .get<string>('JWT_PUBLIC_KEY')
-          ?.replace(/\\n/g, '\n'),
-        signOptions: { algorithm: 'RS256' },
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { algorithm: 'HS256' },
       }),
       inject: [ConfigService],
       global: true,

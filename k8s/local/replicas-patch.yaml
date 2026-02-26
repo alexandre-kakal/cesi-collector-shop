@@ -33,3 +33,11 @@ metadata:
   namespace: cesi-shop
 spec:
   replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cesi-shop
+spec:
+  replicas: 1

@@ -7,7 +7,7 @@ namespace: cesi-shop
 resources:
   - ../base/namespace.yaml
   - ../base/configmap.yaml
-  - ../base/secrets.yaml
+  - ../base/secrets-local.yaml
   - ../infrastructure/postgresql-auth.yaml
   - ../infrastructure/postgresql-listing.yaml
   - ../infrastructure/postgresql-media.yaml
@@ -15,6 +15,7 @@ resources:
   - ../infrastructure/rabbitmq.yaml
   - ../infrastructure/redis.yaml
   - ../infrastructure/minio.yaml
+  - ../apps/frontend.yaml
   - ../apps/auth.yaml
   - ../apps/listing.yaml
   - ../apps/media.yaml
@@ -34,17 +35,20 @@ configMapGenerator:
       - ENV=local
       - DEBUG=true
 
-# Images (à remplacer par votre registry local)
+# Images (Minikube local)
 images:
+  - name: cesi-shop-frontend
+    newName: cesi-shop-frontend
+    newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-auth
-    newName: localhost:32770/cesi-shop-auth
+    newName: cesi-shop-auth
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-listing
-    newName: localhost:32770/cesi-shop-listing
+    newName: cesi-shop-listing
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-media
-    newName: localhost:32770/cesi-shop-media
+    newName: cesi-shop-media
     newTag: dev
   - name: YOUR_REGISTRY/cesi-shop-moderation
-    newName: localhost:32770/cesi-shop-moderation
+    newName: cesi-shop-moderation
     newTag: dev

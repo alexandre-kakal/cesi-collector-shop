@@ -1,22 +1,22 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { RabbitMQClientModule } from '@app/shared';
+import { RabbitMQClientModule, JwtStrategy, JwtAuthGuard } from '@app/shared';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        privateKey: configService
-          .get<string>('JWT_PRIVATE_KEY')
-          ?.replace(/\\n/g, '\n'),
+        secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          algorithm: 'RS256',
-          expiresIn: '15m',
+          algorithm: 'HS256',
+          expiresIn: 900, // 15 minutes in seconds
         },
       }),
       inject: [ConfigService],
@@ -33,6 +33,6 @@ import { RedisModule } from '../redis/redis.module';
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
 })
 export class AuthModule {}

@@ -22,18 +22,10 @@ spec:
       - name: wait-for-rabbitmq
         image: busybox:1.36
         command: ['sh', '-c', 'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done;']
-      - name: prisma-migrate
-        image: YOUR_REGISTRY/cesi-shop-listing:latest  # À remplacer par votre registry
-        command: ['npx', 'prisma', 'migrate', 'deploy', '--config', './apps/listing/prisma.config.ts']
-        env:
-        - name: LISTING_DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: LISTING_DATABASE_URL
       containers:
       - name: listing
         image: YOUR_REGISTRY/cesi-shop-listing:latest  # À remplacer par votre registry
+        command: ["node", "dist/apps/listing/apps/listing/src/main.js"]
         ports:
         - containerPort: 3020
         env:
@@ -49,9 +41,14 @@ spec:
               key: LISTING_DATABASE_URL
         - name: RABBITMQ_URL
           valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secrets
+              key: RABBITMQ_URL
+        - name: MEDIA_SERVICE_URL
+          valueFrom:
             configMapKeyRef:
               name: app-config
-              key: RABBITMQ_URL
+              key: MEDIA_SERVICE_URL
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:

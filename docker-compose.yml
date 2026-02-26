@@ -275,3 +275,49 @@ services:
       minio:
         condition: service_healthy
     restart: unless-stopped
+
+  # ============================================================
+  # Frontend Service
+  # ============================================================
+  frontend:
+    build:
+      context: ../cesi-collector-shop-front
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080
+    container_name: collector-frontend
+    networks:
+      - collector-net
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost/health']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================
+  # Nginx API Gateway
+  # ============================================================
+  nginx:
+    image: nginx:1.26-alpine
+    container_name: collector-nginx
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - collector-net
+    depends_on:
+      - frontend
+      - auth
+      - listing
+      - moderation
+      - media
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

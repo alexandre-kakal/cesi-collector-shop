@@ -1,6 +1,14 @@
-import { Injectable, Inject, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { JwtService } from '@nestjs/jwt';
+import * as argon2 from 'argon2';
+import { v4 as uuidv4 } from 'uuid';
 import {
   RABBITMQ_CLIENT_TOKEN,
   RABBITMQ_ROUTING_KEYS,
@@ -8,8 +16,8 @@ import {
   Role,
   JwtPayload,
 } from '@app/shared';
+import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -20,7 +28,100 @@ export class AuthService {
     private readonly rmqClient: ClientProxy,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  async login(
+    email: string,
+    password: string,
+  ): Promise<{
+    user: { id: string; email: string; name: string; role: string };
+    tokens: { accessToken: string; refreshToken: string };
+  }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const account = await this.prisma.account.findFirst({
+      where: { userId: user.id, providerId: 'credential' },
+    });
+    if (!account?.password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const valid = await argon2.verify(account.password, password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role as Role);
+    return {
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      tokens,
+    };
+  }
+
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    role: Role,
+  ): Promise<{
+    user: { id: string; email: string; name: string; role: string };
+    tokens: { accessToken: string; refreshToken: string };
+  }> {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const now = new Date();
+    const userId = uuidv4();
+    const accountId = uuidv4();
+    const passwordHash = await argon2.hash(password);
+
+    await this.prisma.user.create({
+      data: {
+        id: userId,
+        name,
+        email,
+        emailVerified: false,
+        role,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await this.prisma.account.create({
+      data: {
+        id: accountId,
+        accountId: userId,
+        providerId: 'credential',
+        userId,
+        password: passwordHash,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await this.publishUserRegistered(userId, email, role);
+    const tokens = await this.generateTokens(userId, email, role);
+    return {
+      user: { id: userId, email, name, role },
+      tokens,
+    };
+  }
+
+  async getUserById(
+    userId: string,
+  ): Promise<{ id: string; name: string; email: string; role: string } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return user;
+  }
 
   async publishUserRegistered(userId: string, email: string, role: string): Promise<void> {
     const event: UserRegisteredEvent = {
@@ -34,7 +135,11 @@ export class AuthService {
     this.logger.log(`Published user.registered event for userId: ${userId}`);
   }
 
-  async generateTokens(userId: string, email: string, role: Role): Promise<{
+  async generateTokens(
+    userId: string,
+    email: string,
+    role: Role,
+  ): Promise<{
     accessToken: string;
     refreshToken: string;
   }> {

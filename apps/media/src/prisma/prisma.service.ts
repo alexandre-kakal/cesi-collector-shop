@@ -13,7 +13,7 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     const adapter = new PrismaPg({
-      connectionString: process.env.DATABASE_URL ?? '',
+      connectionString: process.env.DATABASE_URL ?? process.env.MEDIA_DATABASE_URL ?? '',
     });
     super({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
   }

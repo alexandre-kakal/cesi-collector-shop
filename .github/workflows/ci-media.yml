@@ -2,7 +2,7 @@ name: CI/CD - Media Service
 # test
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "apps/media/**"
       - "libs/shared/**"
@@ -11,7 +11,7 @@ on:
       - "Dockerfile.media"
       - ".github/workflows/ci-media.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "apps/media/**"
       - "libs/shared/**"
@@ -101,7 +101,7 @@ jobs:
           MEDIA_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_media_test
 
       - name: Generate coverage report
-        run: npm run test:cov -- --testPathPatterns=apps/media --coverageDirectory=coverage/media
+        run: npm run test:cov -- --testPathPatterns=apps/media --coverageDirectory=coverage/media --collectCoverageFrom='apps/media/**/*.ts' --collectCoverageFrom='libs/shared/**/*.ts' --collectCoverageFrom='!**/*.spec.ts' --collectCoverageFrom='!**/*.integration-spec.ts' --collectCoverageFrom='!**/seed-runner.ts' --collectCoverageFrom='!**/seed.service.ts' --collectCoverageFrom='!libs/shared/src/strategies/**' --collectCoverageFrom='!libs/shared/src/rabbitmq/rabbitmq.module.ts' --collectCoverageFrom='!**/prisma.service.ts' --collectCoverageFrom='!**/minio.service.ts' --collectCoverageFrom='!**/sharp.service.ts'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

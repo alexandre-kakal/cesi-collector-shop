@@ -35,3 +35,6 @@ export * from './events/media.events';
 // RabbitMQ
 export * from './rabbitmq/rabbitmq.constants';
 export * from './rabbitmq/rabbitmq.module';
+
+// Seed (IDs partagés entre micro-services)
+export * from './seed-ids';

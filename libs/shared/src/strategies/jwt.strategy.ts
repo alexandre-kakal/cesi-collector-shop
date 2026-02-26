@@ -8,13 +8,15 @@ import { RequestUser } from '../interfaces/request-user.interface';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(private configService: ConfigService) {
+    const secret = configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET is required. Set it in your .env or environment variables.');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService
-        .get<string>('JWT_PUBLIC_KEY')
-        ?.replace(/\\n/g, '\n'),
-      algorithms: ['RS256'],
+      secretOrKey: secret,
+      algorithms: ['HS256'],
     });
   }
 

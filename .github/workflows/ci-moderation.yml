@@ -2,22 +2,22 @@ name: CI/CD - Moderation Service
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
-      - 'apps/moderation/**'
-      - 'libs/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile.moderation'
-      - '.github/workflows/ci-moderation.yml'
+      - "apps/moderation/**"
+      - "libs/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile.moderation"
+      - ".github/workflows/ci-moderation.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
-      - 'apps/moderation/**'
-      - 'libs/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile.moderation'
+      - "apps/moderation/**"
+      - "libs/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile.moderation"
 
 env:
   SERVICE_NAME: moderation
@@ -33,8 +33,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -69,8 +69,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -101,7 +101,7 @@ jobs:
           MODERATION_DATABASE_URL: postgresql://collector:collector123@localhost:5432/cesi_moderation_test
 
       - name: Generate coverage report
-        run: npm run test:cov -- --testPathPatterns=apps/moderation --coverageDirectory=coverage/moderation
+        run: npm run test:cov -- --testPathPatterns=apps/moderation --coverageDirectory=coverage/moderation --collectCoverageFrom='apps/moderation/**/*.ts' --collectCoverageFrom='libs/shared/**/*.ts' --collectCoverageFrom='!**/*.spec.ts' --collectCoverageFrom='!**/*.integration-spec.ts' --collectCoverageFrom='!**/seed-runner.ts' --collectCoverageFrom='!**/seed.service.ts' --collectCoverageFrom='!libs/shared/src/strategies/**' --collectCoverageFrom='!libs/shared/src/rabbitmq/rabbitmq.module.ts' --collectCoverageFrom='!**/prisma.service.ts'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -123,8 +123,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -144,16 +144,16 @@ jobs:
       - name: Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: 'apps/moderation'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: "fs"
+          scan-ref: "apps/moderation"
+          format: "sarif"
+          output: "trivy-results.sarif"
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
   build:
     name: Build & Push Docker Image
@@ -211,14 +211,14 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
+          format: "sarif"
+          output: "trivy-image-results.sarif"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-image-results.sarif'
+          sarif_file: "trivy-image-results.sarif"
 
   # update-manifests: désactivé
   # update-manifests:

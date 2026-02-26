@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateListingDto } from './dto/create-listing.dto';
@@ -19,9 +20,32 @@ export class ListingService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     @Inject(RABBITMQ_CLIENT_TOKEN)
     private readonly rmqClient: ClientProxy,
   ) {}
+
+  private async fetchMedia(mediaId: string): Promise<{ originalUrl?: string; variants?: { variantType: string; url: string }[] } | null> {
+    const baseUrl = this.configService.get<string>('MEDIA_SERVICE_URL', 'http://media:3050');
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/media/${mediaId}`);
+      if (!res.ok) return null;
+      return res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  private async enrichPhotosWithMedia<T extends { photos: { mediaId: string }[] }>(item: T): Promise<T> {
+    if (!item.photos?.length) return item;
+    const photosWithMedia = await Promise.all(
+      item.photos.map(async (photo) => {
+        const media = await this.fetchMedia(photo.mediaId);
+        return { ...photo, media: media || undefined };
+      }),
+    );
+    return { ...item, photos: photosWithMedia };
+  }
 
   async create(dto: CreateListingDto, sellerId: string) {
     const listing = await this.prisma.listing.create({
@@ -49,7 +73,7 @@ export class ListingService {
   }
 
   async findAll(filter: FilterListingDto, user?: RequestUser) {
-    const { status, categoryId, page = 1, limit = 20 } = filter;
+    const { status, categoryId, sellerId: filterSellerId, page = 1, limit = 20 } = filter;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -59,32 +83,46 @@ export class ListingService {
       // Public/BUYER: Only APPROVED listings
       where.status = ListingStatus.APPROVED;
     } else if (user.role === Role.SELLER) {
-      // SELLER: APPROVED OR (PENDING AND owned by them)
-      where.OR = [
-        { status: ListingStatus.APPROVED },
-        { status: ListingStatus.PENDING, sellerId: user.id },
-      ];
+      // SELLER: only their listings when sellerId is requested (and must match user)
+      if (filterSellerId && filterSellerId === user.id) {
+        where.sellerId = user.id;
+        if (status) where.status = status;
+      } else {
+        // Sinon: APPROVED ou (PENDING et possédées par eux), sauf si status est explicite
+        if (status) {
+          where.status = status;
+        } else {
+          where.OR = [
+            { status: ListingStatus.APPROVED },
+            { status: ListingStatus.PENDING, sellerId: user.id },
+          ];
+        }
+      }
     }
-    // ADMIN: No filter, sees all statuses
+    // ADMIN: No filter by default, sees all statuses
 
-    // Apply additional filters
+    // Apply additional filters for ADMIN
     if (status && user?.role === Role.ADMIN) {
       delete where.OR;
       where.status = status;
     }
+    if (filterSellerId && user?.role === Role.ADMIN) {
+      where.sellerId = filterSellerId;
+    }
     if (categoryId) where.categoryId = categoryId;
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.listing.findMany({
         where,
         skip,
         take: limit,
-        include: { category: true, photos: true },
+        include: { category: true, photos: { orderBy: { order: 'asc' } } },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.listing.count({ where }),
     ]);
 
+    const items = await Promise.all(rawItems.map((item) => this.enrichPhotosWithMedia(item)));
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
@@ -113,17 +151,19 @@ export class ListingService {
     }
     // ADMIN can see everything
 
-    return listing;
+    return this.enrichPhotosWithMedia(listing);
   }
 
   async update(id: string, dto: UpdateListingDto, user: RequestUser) {
     const listing = await this.findOne(id, user);
 
-    // Re-moderation logic: SELLER editing APPROVED listing → back to PENDING
+    // Re-moderation logic: SELLER edit → toujours PENDING + événement pour la file de modération
     let newStatus = listing.status;
-    if (user.role === Role.SELLER && listing.status === ListingStatus.APPROVED) {
+    if (user.role === Role.SELLER) {
       newStatus = ListingStatus.PENDING;
-      this.logger.log(`Listing ${id} status changed to PENDING due to SELLER modification`);
+      if (listing.status !== ListingStatus.PENDING) {
+        this.logger.log(`Listing ${id} status changed to PENDING due to SELLER modification`);
+      }
     }
     // ADMIN updates don't trigger re-moderation
 
@@ -133,8 +173,8 @@ export class ListingService {
       include: { category: true, photos: true },
     });
 
-    // Emit event if status changed back to PENDING
-    if (newStatus === ListingStatus.PENDING && listing.status !== ListingStatus.PENDING) {
+    // Émettre l'événement pour (re-)enqueue en modération à chaque modification SELLER
+    if (user.role === Role.SELLER) {
       const event: ListingCreatedEvent = {
         listingId: updated.id,
         sellerId: updated.sellerId,
@@ -144,7 +184,7 @@ export class ListingService {
         createdAt: updated.createdAt,
       };
       this.rmqClient.emit(RABBITMQ_ROUTING_KEYS.LISTING_CREATED, event);
-      this.logger.log(`Re-enqueued listing ${id} for moderation`);
+      this.logger.log(`Listing ${id} (re-)enqueued for moderation`);
     }
 
     return updated;
@@ -160,6 +200,15 @@ export class ListingService {
       where: { id },
       data: { status },
     });
+  }
+
+  async getNextPhotoOrder(listingId: string): Promise<number> {
+    const last = await this.prisma.listingPhoto.findFirst({
+      where: { listingId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    return last ? last.order + 1 : 0;
   }
 
   async addPhoto(listingId: string, mediaId: string, order = 0) {
