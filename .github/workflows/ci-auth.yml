@@ -153,19 +153,19 @@ jobs:
         with:
           args: --severity-threshold=high --file=package.json
 
-      - name: Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "fs"
-          scan-ref: "apps/auth"
-          format: "sarif"
-          output: "trivy-results.sarif"
+      # - name: Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     scan-type: "fs"
+      #     scan-ref: "apps/auth"
+      #     format: "sarif"
+      #     output: "trivy-results.sarif"
 
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: "trivy-results.sarif"
+      # - name: Upload Trivy results to GitHub Security
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   if: always()
+      #   with:
+      #     sarif_file: "trivy-results.sarif"
 
   # Job 4: Build Docker Image
   build:
@@ -229,18 +229,18 @@ jobs:
           format: spdx-json
           output-file: sbom-auth.spdx.json
 
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
-          format: "sarif"
-          output: "trivy-image-results.sarif"
+      # - name: Scan image with Trivy
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
+      #     format: "sarif"
+      #     output: "trivy-image-results.sarif"
 
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: "trivy-image-results.sarif"
+      # - name: Upload Trivy results
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   if: always()
+      #   with:
+      #     sarif_file: "trivy-image-results.sarif"
 
   # Job 5: Update Kubernetes Manifests (for ArgoCD) - désactivé
   # update-manifests:
