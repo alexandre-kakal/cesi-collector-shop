@@ -10,8 +10,8 @@ NAMESPACE = cesi-shop
 .PHONY: help minikube-start minikube-status build-images minikube-load certs \
 	sops-decrypt k8s-apply k8s-delete k8s-status k8s-local k8s-local-start \
 	argocd-install argocd-apps argocd argocd-password argocd-ui \
-	monitoring-install monitoring-ui monitoring-ingress \
-	k8s-deploy validate
+	monitoring-install monitoring-ui monitoring-prometheus monitoring-ingress \
+	k8s-deploy validate k6
 
 # ─────────────────────────────────────────────
 # Aide
@@ -50,6 +50,7 @@ help:
 	@echo "Monitoring (Prometheus + Grafana):"
 	@echo "  monitoring-install  Installer kube-prometheus-stack (Prometheus, Grafana, dashboards CPU/RAM/Disk)"
 	@echo "  monitoring-ui       Port-forward Grafana sur http://localhost:3000"
+	@echo "  monitoring-prometheus  Port-forward Prometheus sur http://localhost:9090"
 	@echo "  monitoring-ingress  Configurer l'Ingress Grafana (https://grafana.cesi-shop.local)"
 	@echo ""
 	@echo "Déploiement direct (sans Kustomize):"
@@ -57,6 +58,9 @@ help:
 	@echo ""
 	@echo "Validation:"
 	@echo "  validate          Vérifier outils, manifests, secrets"
+	@echo ""
+	@echo "Tests de charge:"
+	@echo "  k6                Stress test K6 (https://cesi-shop.local, 10 VUs, 30s)"
 	@echo ""
 	@echo "Variables: REGISTRY=$(REGISTRY)  TAG=$(TAG)"
 
@@ -78,10 +82,10 @@ minikube-status:
 # ─────────────────────────────────────────────
 build-images:
 	@echo "🔨 Building Docker images $(REGISTRY) tag=$(TAG)..."
-	docker build -f Dockerfile.auth -t cesi-shop-auth:$(TAG) .
-	docker build -f Dockerfile.listing -t cesi-shop-listing:$(TAG) .
-	docker build -f Dockerfile.media -t cesi-shop-media:$(TAG) .
-	docker build -f Dockerfile.moderation -t cesi-shop-moderation:$(TAG) .
+	docker build --no-cache -f Dockerfile.auth -t cesi-shop-auth:$(TAG) .
+	docker build --no-cache -f Dockerfile.listing -t cesi-shop-listing:$(TAG) .
+	docker build --no-cache -f Dockerfile.media -t cesi-shop-media:$(TAG) .
+	docker build --no-cache -f Dockerfile.moderation -t cesi-shop-moderation:$(TAG) .
 	@echo "✅ Backend images built."
 
 build-frontend:
@@ -195,12 +199,47 @@ monitoring-install:
 	kubectl create namespace monitoring 2>/dev/null || true
 	helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
 		-n monitoring \
-		--set grafana.adminPassword=admin
+		-f k8s/monitoring/kube-prometheus-stack-values.yaml
+	@echo "Applying ServiceMonitors and secrets (namespace monitoring)..."
+	kubectl apply -f k8s/monitoring/rabbitmq-prometheus-secret.yaml
+	kubectl apply -f k8s/monitoring/servicemonitor-apps.yaml
+	kubectl apply -f k8s/monitoring/servicemonitor-rabbitmq.yaml
 	@echo "✅ Monitoring stack installed. Access Grafana: make monitoring-ui"
+	@echo "   Optional: make monitoring-postgres"
+	@echo "   Si cesi-shop-apps 404: make monitoring-fix-apps (rebuild images backend)"
+
+monitoring-fix-apps:
+	@echo "🔨 Rebuilding backend images (incl. /metrics Prometheus)..."
+	$(MAKE) build-images
+	@echo "📤 Loading into Minikube..."
+	minikube image load cesi-shop-auth:$(TAG)
+	minikube image load cesi-shop-listing:$(TAG)
+	minikube image load cesi-shop-media:$(TAG)
+	minikube image load cesi-shop-moderation:$(TAG)
+	@echo "🔄 Restarting deployments..."
+	kubectl rollout restart deployment -n $(NAMESPACE) auth-service listing-service media-service moderation-service
+	@echo "✅ Done. Vérifier /metrics dans ~1 min."
+
+monitoring-postgres:
+	@echo "📊 Installing postgres-exporter (metriques PostgreSQL)..."
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+	kubectl create namespace monitoring 2>/dev/null || true
+	@echo "Creating postgres-exporter-auth secret (DB auth)..."
+	kubectl create secret generic postgres-exporter-auth -n monitoring \
+		--from-literal=DATA_SOURCE_NAME="postgresql://cesishop_dev:devpassword123@postgres-auth.cesi-shop.svc.cluster.local:5432/auth?sslmode=disable" \
+		--dry-run=client -o yaml | kubectl apply -f -
+	helm upgrade --install postgres-exporter-auth prometheus-community/prometheus-postgres-exporter \
+		-n monitoring -f k8s/monitoring/postgres-exporter-values.yaml
+	@echo "✅ Postgres-exporter (auth) installed. Répéter pour listing/media/moderation si besoin."
 
 monitoring-ui:
 	@echo "🌐 Grafana: http://localhost:3000 (admin / admin)"
 	kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+
+monitoring-prometheus:
+	@echo "📊 Prometheus: http://localhost:9090"
+	kubectl port-forward svc/kube-prometheus-stack-prometheus -n monitoring 9090:9090
 
 monitoring-ingress: certs
 	@echo "🔗 Configuring Grafana Ingress..."
@@ -239,3 +278,11 @@ k8s-deploy:
 # ─────────────────────────────────────────────
 validate:
 	./scripts/validate-setup.sh
+
+# ─────────────────────────────────────────────
+# K6 Stress Test (Minikube)
+# ─────────────────────────────────────────────
+k6:
+	@echo "🚀 Running K6 stress test (https://cesi-shop.local)..."
+	@echo "   Ensure: minikube tunnel + /etc/hosts has \$$(minikube ip) cesi-shop.local"
+	k6 run k6-load-test.js

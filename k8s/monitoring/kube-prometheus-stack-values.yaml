@@ -1,0 +1,19 @@
+# Valeurs pour kube-prometheus-stack (Minikube)
+# Désactive les composants dont les métriques ne sont pas exposées sur Minikube
+
+# Grafana admin
+grafana:
+  adminPassword: admin
+
+# Désactiver les ServiceMonitors qui échouent sur Minikube
+kubeControllerManager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubelet:
+  enabled: false

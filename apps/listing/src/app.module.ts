@@ -7,10 +7,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { CategoryModule } from './category/category.module';
 import { ListingModule } from './listing/listing.module';
 import { EventsModule } from './events/events.module';
-import { JwtStrategy, JwtAuthGuard, HealthController } from '@app/shared';
+import { JwtStrategy, JwtAuthGuard, HealthController, PrometheusModule } from '@app/shared';
 
 @Module({
   imports: [
+    PrometheusModule.forRoot({ serviceName: 'listing' }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: 'apps/listing/.env',

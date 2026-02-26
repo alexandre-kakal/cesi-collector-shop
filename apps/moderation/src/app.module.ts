@@ -6,10 +6,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { EventsModule } from './events/events.module';
-import { JwtStrategy, JwtAuthGuard, HealthController } from '@app/shared';
+import { JwtStrategy, JwtAuthGuard, HealthController, PrometheusModule } from '@app/shared';
 
 @Module({
   imports: [
+    PrometheusModule.forRoot({ serviceName: 'moderation' }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: 'apps/moderation/.env',

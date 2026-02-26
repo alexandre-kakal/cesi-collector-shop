@@ -32,6 +32,9 @@ export * from './events/user.events';
 export * from './events/listing.events';
 export * from './events/media.events';
 
+// Prometheus
+export * from './prometheus';
+
 // RabbitMQ
 export * from './rabbitmq/rabbitmq.constants';
 export * from './rabbitmq/rabbitmq.module';

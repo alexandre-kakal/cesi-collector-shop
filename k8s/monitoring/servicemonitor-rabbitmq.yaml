@@ -1,0 +1,22 @@
+# ServiceMonitor pour RabbitMQ (namespace monitoring pour que Prometheus le découvre)
+# Utilise le plugin rabbitmq_prometheus (port 15692, path /metrics, sans auth)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app: rabbitmq
+spec:
+  selector:
+    matchLabels:
+      app: rabbitmq
+  namespaceSelector:
+    matchNames:
+      - cesi-shop
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
+      scheme: http

@@ -1,0 +1,20 @@
+# ServiceMonitor pour les apps NestJS (namespace monitoring pour que Prometheus le découvre)
+# Scrape les Services dans cesi-shop via namespaceSelector
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cesi-shop-apps
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      monitoring: "true"
+  namespaceSelector:
+    matchNames:
+      - cesi-shop
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
